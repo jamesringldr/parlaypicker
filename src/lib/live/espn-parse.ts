@@ -31,6 +31,15 @@ export function elapsedShare(period: number | null, displayClock: unknown): numb
   return ((period - 1) * QUARTER_SECONDS + (QUARTER_SECONDS - left)) / (4 * QUARTER_SECONDS);
 }
 
+// What to show in place of the kickoff time during a game: "Q2 · 4:06", "Halftime", "OT · 7:00".
+export function gameClock(period: number | null, displayClock: unknown, statusName: unknown, shortDetail: unknown): string | undefined {
+  if ((statusName === "STATUS_HALFTIME" || statusName === "STATUS_END_PERIOD") && typeof shortDetail === "string") {
+    return shortDetail; // "Halftime", "End of 1st"
+  }
+  if (period === null || period < 1 || typeof displayClock !== "string") return undefined;
+  return `${period > 4 ? "OT" : `Q${period}`} · ${displayClock}`;
+}
+
 export function parseScoreboard(json: unknown): EspnGame[] {
   if (!isObj(json)) return [];
   const games: EspnGame[] = [];
@@ -63,7 +72,7 @@ export function parseScoreboard(json: unknown): EspnGame[] {
         completed,
         homeScore: started ? num(home?.score) : null,
         awayScore: started ? num(away?.score) : null,
-        clock: state === "in" && typeof type.shortDetail === "string" ? type.shortDetail : undefined,
+        clock: state === "in" ? gameClock(num(status.period), status.displayClock, type.name, type.shortDetail) : undefined,
         elapsed,
       },
     });
@@ -102,4 +111,14 @@ export function parseBox(json: unknown): BoxScore | null {
   }
 
   return box;
+}
+
+// The most recent scoring play, e.g. "NE: Rhamondre Stevenson 1 Yd Rush (Andy Borregales Kick)".
+// The team is added because field goals don't say who scored. Null if nobody has scored yet.
+export function parseLastScoringPlay(json: unknown): string | null {
+  if (!isObj(json)) return null;
+  const play = arr(json.scoringPlays).at(-1);
+  if (!isObj(play) || typeof play.text !== "string") return null;
+  const team = isObj(play.team) && typeof play.team.abbreviation === "string" ? play.team.abbreviation : null;
+  return team ? `${team}: ${play.text}` : play.text;
 }

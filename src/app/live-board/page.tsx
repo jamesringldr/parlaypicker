@@ -2,10 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
 import { AutoRefresh } from "@/components/auto-refresh";
+import { KickoffTime } from "@/components/kickoff-time";
 import { getBoard, LIVE_PATH } from "@/lib/live/board";
 import { gameIsLive, gradeLeg, parlayState, type Grade, type Leg, type LegKind, type LegState } from "@/lib/live/grade";
 import { legLogos } from "@/lib/live/logos";
 import { getScores } from "@/lib/live/scores";
+import { matchupLine } from "@/lib/live/teams";
 import { formatPrice, parlayPrice, toDecimal } from "@/lib/rules";
 
 // The group always bets $5.
@@ -121,7 +123,25 @@ function Logos({ urls, live }: { urls: string[]; live: boolean }) {
   );
 }
 
-function LegRow({ leg, grade, settled, live }: { leg: Leg; grade: Grade; settled: boolean; live: boolean }) {
+function LegRow({
+  leg,
+  grade,
+  settled,
+  live,
+  clock,
+  final,
+  matchup,
+  renderedAt,
+}: {
+  leg: Leg;
+  grade: Grade;
+  settled: boolean;
+  live: boolean;
+  clock?: string;
+  final: boolean;
+  matchup: string;
+  renderedAt: number;
+}) {
   const accent = settled ? "text-zinc-100" : "text-blue-400";
   const status = grade.label ?? STATUS_TEXT[grade.state];
   return (
@@ -139,10 +159,16 @@ function LegRow({ leg, grade, settled, live }: { leg: Leg; grade: Grade; settled
           {leg.price !== undefined && <p className="shrink-0 text-xl font-bold">{formatPrice(leg.price)}</p>}
         </div>
         <div className="mt-2 flex items-baseline justify-between gap-3 text-sm">
-          <p className={`min-w-0 truncate ${accent}`}>{leg.matchup ?? ""}</p>
+          <p className={`min-w-0 truncate ${accent}`}>{matchup}</p>
           {leg.commenceTime && (
             <p className="shrink-0 text-xs uppercase tracking-wide text-zinc-400">
-              {centralTime.format(new Date(leg.commenceTime))} CT
+              <KickoffTime
+                kickoff={leg.commenceTime}
+                scheduled={`${centralTime.format(new Date(leg.commenceTime))} CT`}
+                live={clock}
+                final={final}
+                renderedAt={renderedAt}
+              />
             </p>
           )}
         </div>
@@ -162,13 +188,17 @@ export default async function LiveParlay(props: PageProps<"/live-board">) {
   const view = tab === "settled" ? "settled" : "open";
 
   const { legs, totalPrice } = await getBoard();
-  const { scores, boxes, backup, error } = await getScores(legs);
+  const { scores, boxes, backup, error, at: renderedAt } = await getScores(legs);
   const graded = legs.map((leg) => {
     const score = leg.eventId ? scores.get(leg.eventId) : undefined;
     return {
       leg,
       grade: gradeLeg(leg, score, leg.eventId ? boxes.get(leg.eventId) : undefined),
       live: gameIsLive(score),
+      // Shown in place of the kickoff time while the game is on. A source with no game clock still says Live.
+      clock: gameIsLive(score) ? (score?.clock ?? "Live") : undefined,
+      final: !!score?.completed,
+      matchup: matchupLine(leg, score),
     };
   });
 
@@ -244,8 +274,18 @@ export default async function LiveParlay(props: PageProps<"/live-board">) {
       <ul className="relative">
         {/* The timeline rail. The markers sit on top of it. */}
         {shown.length > 1 && <div className="absolute bottom-6 left-3 top-6 w-px bg-zinc-700" aria-hidden />}
-        {[...shown].sort(byKickoff).map(({ leg, grade, live }) => (
-          <LegRow key={leg.id} leg={leg} grade={grade} settled={view === "settled"} live={live} />
+        {[...shown].sort(byKickoff).map(({ leg, grade, live, clock, final, matchup }) => (
+          <LegRow
+            key={leg.id}
+            leg={leg}
+            grade={grade}
+            settled={view === "settled"}
+            live={live}
+            clock={clock}
+            final={final}
+            matchup={matchup}
+            renderedAt={renderedAt}
+          />
         ))}
       </ul>
     </main>
