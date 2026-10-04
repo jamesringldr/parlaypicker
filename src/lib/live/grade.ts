@@ -52,6 +52,8 @@ export interface GameScore {
   awayScore: number | null;
   // "Halftime", "7:58 - 3rd". Only from sources that have a game clock.
   clock?: string;
+  // Share of regulation played, 0 to 1. Only from sources that have a game clock.
+  elapsed?: number;
 }
 
 // Player stats for one game, keyed by normName().
@@ -78,6 +80,8 @@ export type LegState = "pending" | "winning" | "losing" | "hit" | "miss" | "push
 export interface Grade {
   state: LegState;
   detail: string;
+  // Overrides the badge wording, e.g. "On pace" for a prop graded by pace.
+  label?: string;
 }
 
 // Positive = leg is currently covering, 0 = push, negative = not covering.
@@ -95,6 +99,11 @@ function cushion(leg: Leg, score: GameScore): number | null {
   }
   return null;
 }
+
+// Pace is meaningless in the first minutes (0 yards at 5% of the game is not "behind").
+const PACE_AFTER = 0.25;
+
+const percent = (n: number) => `${Math.round(n * 100)}%`;
 
 const sign = (n: number): "hit" | "miss" | "push" => (n > 0 ? "hit" : n < 0 ? "miss" : "push");
 
@@ -124,10 +133,23 @@ function gradeProp(spec: PropSpec, score: GameScore | undefined, box: BoxScore |
   if (score.completed) {
     return { state: sign(over ? value - line : line - value), detail: `Final: ${progress}` };
   }
-  const covering = over ? value > line : value <= line;
+  // Past the line: an over is cashing for now, an under has busted.
+  if (value > line) {
+    return { state: over ? "winning" : "losing", label: "Over the line", detail: `Live: ${progress}` };
+  }
+
+  // Otherwise compare the share of the line reached to the share of the game played. It's a
+  // rough guide (game script and garbage time bend it), so it waits until there's enough game
+  // to mean something, and it needs a source with a game clock.
+  const played = score.elapsed;
+  if (played === undefined || played < PACE_AFTER || line <= 0) return { state: "pending", detail: `Live: ${progress}` };
+
+  const share = value / line;
+  const onPace = over ? share >= played : share <= played;
   return {
-    state: covering ? "winning" : over ? "pending" : "losing",
-    detail: `Live: ${progress}`,
+    state: onPace ? "winning" : "losing",
+    label: onPace ? "On pace" : "Off pace",
+    detail: `Live: ${progress} (${percent(share)} of line, ${percent(played)} of game)`,
   };
 }
 

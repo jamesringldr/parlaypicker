@@ -118,7 +118,7 @@ function Logos({ urls }: { urls: string[] }) {
 
 function LegRow({ leg, grade, settled }: { leg: Leg; grade: Grade; settled: boolean }) {
   const accent = settled ? "text-zinc-100" : "text-blue-400";
-  const status = STATUS_TEXT[grade.state];
+  const status = grade.label ?? STATUS_TEXT[grade.state];
   return (
     <li className="flex gap-3">
       <Marker state={grade.state} />
