@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
 import { AutoRefresh } from "@/components/auto-refresh";
@@ -22,7 +23,16 @@ const centralTime = new Intl.DateTimeFormat("en-US", {
 
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
-export const metadata = { title: "Live Parlay", robots: { index: false, follow: false } };
+const description = "Track the Dubs with the Low-T Parlay Live Board";
+
+// The share image comes from opengraph-image.jpg and twitter-image.jpg in this folder.
+export const metadata: Metadata = {
+  title: "Low-T Parlay Live Board",
+  description,
+  robots: { index: false, follow: false },
+  openGraph: { title: "Low-T Parlay Live Board", description },
+  twitter: { card: "summary_large_image", title: "Low-T Parlay Live Board", description },
+};
 
 const BANNER = {
   alive: null,
