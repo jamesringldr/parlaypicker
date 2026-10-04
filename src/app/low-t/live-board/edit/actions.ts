@@ -3,19 +3,18 @@
 import { randomUUID } from "node:crypto";
 import { notFound, redirect } from "next/navigation";
 import { fail } from "@/lib/action-helpers";
-import { getLegs, isAdminKey, isViewSlug, saveLegs } from "@/lib/live/board";
+import { getLegs, isAdminKey, LIVE_PATH, saveLegs } from "@/lib/live/board";
 import type { Leg, LegKind, Manual } from "@/lib/live/grade";
 import { oddsProvider } from "@/lib/odds";
 
 const KINDS: LegKind[] = ["moneyline", "spread", "total", "prop"];
 const SIDES = ["home", "away", "over", "under"] as const;
 
-// Every action re-checks the slug and key; the form fields can't be trusted.
+// Every action re-checks the key; the form fields can't be trusted.
 function authorize(formData: FormData) {
-  const slug = String(formData.get("slug") ?? "");
   const key = String(formData.get("key") ?? "");
-  if (!isViewSlug(slug) || !isAdminKey(key)) notFound();
-  return `/live/${slug}/edit?key=${encodeURIComponent(key)}`;
+  if (!isAdminKey(key)) notFound();
+  return `${LIVE_PATH}/edit?key=${encodeURIComponent(key)}`;
 }
 
 function num(formData: FormData, name: string): number | undefined {
