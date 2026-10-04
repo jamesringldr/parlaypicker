@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { elapsedShare, parseBox, parseScoreboard } from "./espn-parse";
+import { elapsedShare, gameClock, parseBox, parseLastScoringPlay, parseScoreboard } from "./espn-parse";
 
 const scoreboard = {
   events: [
@@ -51,7 +51,7 @@ describe("parseScoreboard", () => {
       homeTeam: "Washington Commanders",
       awayTeam: "Indianapolis Colts",
       started: true,
-      score: { completed: false, homeScore: 13, awayScore: 17, clock: "7:58 - 3rd", elapsed: (2 * 900 + 422) / 3600 },
+      score: { completed: false, homeScore: 13, awayScore: 17, clock: "Q3 · 7:58", elapsed: (2 * 900 + 422) / 3600 },
     });
   });
 
@@ -137,5 +137,40 @@ describe("parseBox", () => {
     expect(parseBox({ boxscore: { players: [] } })).toBeNull();
     expect(parseBox({})).toBeNull();
     expect(parseBox(null)).toBeNull();
+  });
+});
+
+describe("gameClock", () => {
+  it("is quarter and time remaining", () => {
+    expect(gameClock(2, "4:06", "STATUS_IN_PROGRESS", "4:06 - 2nd")).toBe("Q2 · 4:06");
+    expect(gameClock(4, "0:42", "STATUS_IN_PROGRESS", "0:42 - 4th")).toBe("Q4 · 0:42");
+  });
+  it("says OT in overtime, and uses ESPN's wording at halftime and between quarters", () => {
+    expect(gameClock(5, "7:00", "STATUS_IN_PROGRESS", "7:00 - OT")).toBe("OT · 7:00");
+    expect(gameClock(2, "0:00", "STATUS_HALFTIME", "Halftime")).toBe("Halftime");
+    expect(gameClock(1, "0:00", "STATUS_END_PERIOD", "End of 1st")).toBe("End of 1st");
+  });
+  it("is undefined without a period or clock", () => {
+    expect(gameClock(null, "4:06", "STATUS_IN_PROGRESS", "")).toBeUndefined();
+    expect(gameClock(2, undefined, "STATUS_IN_PROGRESS", "")).toBeUndefined();
+  });
+});
+
+describe("parseLastScoringPlay", () => {
+  it("is the latest play, with the scoring team", () => {
+    expect(
+      parseLastScoringPlay({
+        scoringPlays: [
+          { text: "Drew Stevens 31 Yd Field Goal", team: { abbreviation: "IND" } },
+          { text: "Rhamondre Stevenson 1 Yd Rush (Andy Borregales Kick)", team: { abbreviation: "NE" } },
+        ],
+      }),
+    ).toBe("NE: Rhamondre Stevenson 1 Yd Rush (Andy Borregales Kick)");
+  });
+  it("still works without a team, and is null when nobody has scored or the shape changes", () => {
+    expect(parseLastScoringPlay({ scoringPlays: [{ text: "Safety" }] })).toBe("Safety");
+    expect(parseLastScoringPlay({ scoringPlays: [] })).toBeNull();
+    expect(parseLastScoringPlay({})).toBeNull();
+    expect(parseLastScoringPlay(null)).toBeNull();
   });
 });

@@ -50,10 +50,12 @@ export interface GameScore {
   completed: boolean;
   homeScore: number | null;
   awayScore: number | null;
-  // "Halftime", "7:58 - 3rd". Only from sources that have a game clock.
+  // "Q3 · 7:58" or "Halftime". Only from sources that have a game clock.
   clock?: string;
   // Share of regulation played, 0 to 1. Only from sources that have a game clock.
   elapsed?: number;
+  // The latest scoring play, or "No scoring yet". Only while the game is live.
+  lastPlay?: string;
 }
 
 // Player stats for one game, keyed by normName().
@@ -168,15 +170,11 @@ export function gradeLeg(leg: Leg, score: GameScore | undefined, box?: BoxScore)
   const margin = cushion(leg, score);
   if (margin === null) return { state: "pending", detail: "Not started" };
 
-  const scoreLine =
-    leg.awayTeam && leg.homeTeam
-      ? `${leg.awayTeam} ${score.awayScore}, ${leg.homeTeam} ${score.homeScore}`
-      : "";
-
-  if (score.completed) return { state: sign(margin), detail: `Final: ${scoreLine}` };
+  // The score is already in the line above the leg, so the detail says something new.
+  if (score.completed) return { state: sign(margin), detail: "Final" };
   return {
     state: margin > 0 ? "winning" : margin < 0 ? "losing" : "pending",
-    detail: `Live${score.clock ? ` (${score.clock})` : ""}: ${scoreLine}`,
+    detail: score.lastPlay ?? "Live",
   };
 }
 

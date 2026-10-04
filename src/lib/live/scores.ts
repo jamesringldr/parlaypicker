@@ -1,7 +1,7 @@
 import "server-only";
 import { cached, oddsGet } from "@/lib/odds/the-odds-api";
 import { SPORTS, type Sport } from "@/lib/odds/types";
-import { getEspnBox, getEspnScoreboard } from "./espn";
+import { getEspnScoreboard, getEspnSummary } from "./espn";
 import type { BoxScore, GameScore, Leg } from "./grade";
 
 // Backup source. The scores endpoint costs 2 credits per call (the daysFrom form), so every
@@ -45,6 +45,8 @@ export interface LiveData {
   // True when some scores came from the backup source (no game clock, no prop stats).
   backup: boolean;
   error?: string;
+  // When this was loaded (ms). The page uses it as "now" so it doesn't read the clock itself.
+  at: number;
 }
 
 // Scores and prop stats for the legs' games. ESPN first, The Odds API for anything ESPN can't
@@ -54,7 +56,7 @@ export async function getScores(legs: Leg[]): Promise<LiveData> {
   const started = legs.filter(
     (l) => l.eventId && l.commenceTime && new Date(l.commenceTime).getTime() <= now,
   );
-  const data: LiveData = { scores: new Map(), boxes: new Map(), backup: false };
+  const data: LiveData = { scores: new Map(), boxes: new Map(), backup: false, at: now };
   if (started.length === 0) return data;
 
   // ESPN knows these games by team names, not by The Odds API's ids.
@@ -68,18 +70,35 @@ export async function getScores(legs: Leg[]): Promise<LiveData> {
   const espnGame = (leg: Leg) =>
     leg.sport === "nfl" && leg.homeTeam && leg.awayTeam ? bySides.get(`${leg.homeTeam}|${leg.awayTeam}`) : undefined;
 
+  // Group legs by game so each ESPN game is read once, however many legs are on it.
+  const byGame = new Map<string, { game: NonNullable<ReturnType<typeof espnGame>>; legs: Leg[] }>();
   for (const leg of started) {
     const game = espnGame(leg);
-    if (game) data.scores.set(leg.eventId!, game.score);
+    if (!game) continue;
+    data.scores.set(leg.eventId!, game.score);
+    const entry = byGame.get(game.id) ?? { game, legs: [] };
+    entry.legs.push(leg);
+    byGame.set(game.id, entry);
   }
 
-  // Hand-marked props never need stats, and props with no stat spec can't use them.
-  for (const leg of started) {
-    const game = espnGame(leg);
-    if (leg.kind !== "prop" || !leg.prop || leg.manual || !game?.started) continue;
-    const box = await getEspnBox(game.id).catch(() => null);
-    if (box) data.boxes.set(leg.eventId!, box);
-  }
+  await Promise.all(
+    [...byGame.values()].map(async ({ game, legs: gameLegs }) => {
+      // Player stats grade props (hand-marked ones don't need them). The last scoring play
+      // fills the detail line of a game leg, only while the game is on.
+      const needsBox = gameLegs.some((l) => l.kind === "prop" && l.prop && !l.manual);
+      const needsPlay = !game.score.completed && gameLegs.some((l) => l.kind !== "prop");
+      if (!game.started || (!needsBox && !needsPlay)) return;
+
+      const summary = await getEspnSummary(game.id).catch(() => null);
+      if (!summary) return;
+      for (const leg of gameLegs) {
+        if (summary.box) data.boxes.set(leg.eventId!, summary.box);
+        if (needsPlay) {
+          data.scores.set(leg.eventId!, { ...game.score, lastPlay: summary.lastScoringPlay ?? "No scoring yet" });
+        }
+      }
+    }),
+  );
 
   const missing = started.filter((l) => l.kind !== "prop" && !data.scores.has(l.eventId!));
   const sports = [...new Set(missing.map((l) => l.sport))];

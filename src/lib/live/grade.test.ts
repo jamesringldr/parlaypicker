@@ -184,10 +184,17 @@ describe("normName", () => {
   });
 });
 
-describe("live clock", () => {
-  it("shows the game clock when the source has one", () => {
-    const leg = { ...base, side: "home" as const };
-    expect(gradeLeg(leg, { ...live(7, 3), clock: "Halftime" }).detail).toMatch(/^Live \(Halftime\):/);
+describe("game leg detail", () => {
+  const leg = { ...base, side: "home" as const };
+
+  it("shows the last scoring play while live, since the score is in the line above", () => {
+    const lastPlay = "NE: Rhamondre Stevenson 1 Yd Rush (Andy Borregales Kick)";
+    expect(gradeLeg(leg, { ...live(7, 3), clock: "Q2 · 4:06", lastPlay }).detail).toBe(lastPlay);
+  });
+
+  it("falls back to Live when the source has no scoring plays, and Final at the end", () => {
+    expect(gradeLeg(leg, live(7, 3)).detail).toBe("Live");
+    expect(gradeLeg(leg, final(24, 20)).detail).toBe("Final");
   });
 });
 

@@ -1,6 +1,6 @@
 import "server-only";
 import { cached } from "@/lib/odds/the-odds-api";
-import { parseBox, parseScoreboard, type EspnGame } from "./espn-parse";
+import { parseBox, parseLastScoringPlay, parseScoreboard, type EspnGame } from "./espn-parse";
 import type { BoxScore } from "./grade";
 
 // ESPN's unofficial site API: free, no key, and it can change without notice. Everything here
@@ -23,8 +23,15 @@ export function getEspnScoreboard(): Promise<EspnGame[]> {
   return cached("espn:scoreboard", TTL_MS, async () => parseScoreboard(await espnGet("/scoreboard")));
 }
 
-export function getEspnBox(espnEventId: string): Promise<BoxScore | null> {
-  return cached(`espn:box:${espnEventId}`, TTL_MS, async () =>
-    parseBox(await espnGet(`/summary?event=${encodeURIComponent(espnEventId)}`)),
-  );
+export interface EspnSummary {
+  box: BoxScore | null;
+  lastScoringPlay: string | null;
+}
+
+// One call per game gives both the player stats (props) and the scoring plays (last score).
+export function getEspnSummary(espnEventId: string): Promise<EspnSummary> {
+  return cached(`espn:summary:${espnEventId}`, TTL_MS, async () => {
+    const json = await espnGet(`/summary?event=${encodeURIComponent(espnEventId)}`);
+    return { box: parseBox(json), lastScoringPlay: parseLastScoringPlay(json) };
+  });
 }
