@@ -1,12 +1,26 @@
 import Link from "next/link";
 import { connection } from "next/server";
 import { AutoRefresh } from "@/components/auto-refresh";
-import { LocalTime } from "@/components/local-time";
 import { getBoard, LIVE_PATH } from "@/lib/live/board";
 import { gradeLeg, parlayState, type Grade, type Leg, type LegKind, type LegState } from "@/lib/live/grade";
 import { legLogos } from "@/lib/live/logos";
 import { getScores } from "@/lib/live/scores";
-import { formatPrice, parlayPrice } from "@/lib/rules";
+import { formatPrice, parlayPrice, toDecimal } from "@/lib/rules";
+
+// The group always bets $5.
+const STAKE = 5;
+
+// Central time ("CT" covers CDT and CST), same as the sportsbook shows.
+const centralTime = new Intl.DateTimeFormat("en-US", {
+  weekday: "short",
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  timeZone: "America/Chicago",
+});
+
+const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
 export const metadata = { title: "Live Parlay", robots: { index: false, follow: false } };
 
@@ -113,7 +127,7 @@ function LegRow({ leg, grade, settled }: { leg: Leg; grade: Grade; settled: bool
           <p className={`min-w-0 truncate ${accent}`}>{leg.matchup ?? ""}</p>
           {leg.commenceTime && (
             <p className="shrink-0 text-xs uppercase tracking-wide text-zinc-400">
-              <LocalTime iso={leg.commenceTime} />
+              {centralTime.format(new Date(leg.commenceTime))} CT
             </p>
           )}
         </div>
@@ -152,6 +166,9 @@ export default async function LiveParlay(props: PageProps<"/live-board">) {
   const byKickoff = (a: (typeof graded)[number], b: (typeof graded)[number]) =>
     (a.leg.commenceTime ?? "").localeCompare(b.leg.commenceTime ?? "");
 
+  // Profit on the stake, not the payout (which includes the stake back).
+  const toWin = combined === null ? null : Math.round(STAKE * (toDecimal(combined) - 1) * 100) / 100;
+
   const tabs = [
     { key: "open", label: "Open", count: open.length, href: LIVE_PATH },
     { key: "settled", label: "Settled", count: settled.length, href: `${LIVE_PATH}?tab=settled` },
@@ -161,9 +178,14 @@ export default async function LiveParlay(props: PageProps<"/live-board">) {
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 px-4 py-6">
       <AutoRefresh />
       <header>
-        <h1 className="text-xl font-bold tracking-tight">
-          Live <span className="text-emerald-400">Parlay</span>
-        </h1>
+        <div className="flex items-baseline justify-between gap-3">
+          <h1 className="text-xl font-bold tracking-tight">
+            Live <span className="text-emerald-400">Parlay</span>
+          </h1>
+          {toWin !== null && (
+            <p className="text-xl font-bold tracking-tight text-emerald-400">To Win: {money.format(toWin)}</p>
+          )}
+        </div>
         <p className="text-sm text-zinc-500">
           {hits} of {legs.length} legs hit{combined !== null && <> · pays {formatPrice(combined)}</>} · updates every
           30s
