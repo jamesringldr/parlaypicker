@@ -157,10 +157,10 @@ export default async function LiveParlay(props: PageProps<"/live-board">) {
   const view = tab === "settled" ? "settled" : "open";
 
   const { legs, totalPrice } = await getBoard();
-  const { scores, error } = await getScores(legs);
+  const { scores, boxes, backup, error } = await getScores(legs);
   const graded = legs.map((leg) => ({
     leg,
-    grade: gradeLeg(leg, leg.eventId ? scores.get(leg.eventId) : undefined),
+    grade: gradeLeg(leg, leg.eventId ? scores.get(leg.eventId) : undefined, leg.eventId ? boxes.get(leg.eventId) : undefined),
   }));
 
   const state = parlayState(graded.map((g) => g.grade));
@@ -204,6 +204,9 @@ export default async function LiveParlay(props: PageProps<"/live-board">) {
 
       {banner && <div className={`rounded-xl border p-3 text-sm font-semibold ${banner.className}`}>{banner.text}</div>}
       {error && <p className="text-sm text-amber-300">Live scores are unavailable right now ({error}).</p>}
+      {backup && !error && (
+        <p className="text-xs text-zinc-500">Some scores are coming from a backup source, so they may lag and props won&apos;t update.</p>
+      )}
 
       <nav className="flex gap-1 rounded-xl bg-zinc-900 p-1" aria-label="Legs">
         {tabs.map((t) => (

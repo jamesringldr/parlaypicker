@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { gradeLeg, parlayState, type GameScore, type Leg } from "./grade";
+import { gradeLeg, normName, parlayState, type BoxScore, type GameScore, type Leg } from "./grade";
 
 const base: Leg = {
   id: "1",
@@ -71,5 +71,76 @@ describe("parlayState", () => {
     expect(parlayState([g("hit"), g("push")])).toBe("won");
     expect(parlayState([g("hit"), g("pending")])).toBe("alive");
     expect(parlayState([])).toBe("alive");
+  });
+});
+
+describe("player props", () => {
+  const box = (over: Partial<BoxScore> = {}): BoxScore => ({
+    rush: new Map([["james cook", 54]]),
+    rec: new Map(),
+    pass: new Map(),
+    tdPlays: [],
+    ...over,
+  });
+  const cook = (point: number, side: "over" | "under" = "over"): Leg => ({
+    ...base,
+    kind: "prop",
+    prop: { player: "James Cook", stat: "rush_yds", side, point },
+  });
+  const td = (player: string): Leg => ({ ...base, kind: "prop", prop: { player, stat: "anytime_td" } });
+
+  it("waits for kickoff and for stats", () => {
+    expect(gradeLeg(cook(87.5), undefined, undefined).detail).toBe("Not started");
+    expect(gradeLeg(cook(87.5), live(10, 7), undefined).detail).toMatch(/unavailable/);
+  });
+
+  it("an over is winning once past the line but only settles at the final", () => {
+    expect(gradeLeg(cook(87.5), live(10, 7), box()).state).toBe("pending");
+    expect(gradeLeg(cook(87.5), live(10, 7), box({ rush: new Map([["james cook", 90]]) })).state).toBe("winning");
+    expect(gradeLeg(cook(87.5), final(10, 7), box({ rush: new Map([["james cook", 90]]) })).state).toBe("hit");
+    expect(gradeLeg(cook(87.5), final(10, 7), box()).state).toBe("miss");
+    expect(gradeLeg(cook(54), final(10, 7), box()).state).toBe("push");
+  });
+
+  it("an under is losing once past the line", () => {
+    expect(gradeLeg(cook(87.5, "under"), live(10, 7), box()).state).toBe("winning");
+    expect(gradeLeg(cook(40, "under"), live(10, 7), box()).state).toBe("losing");
+    expect(gradeLeg(cook(87.5, "under"), final(10, 7), box()).state).toBe("hit");
+  });
+
+  it("a player with no stat line has 0 yards", () => {
+    expect(gradeLeg(cook(10), final(10, 7), box({ rush: new Map() })).state).toBe("miss");
+  });
+
+  it("anytime TD hits as soon as the player scores, even mid-game", () => {
+    const scored = box({ tdPlays: ["kenneth walker 4 yd run (kick)"] });
+    expect(gradeLeg(td("Kenneth Walker III"), live(10, 7), scored).state).toBe("hit");
+    expect(gradeLeg(td("Kenneth Walker III"), live(10, 7), box()).state).toBe("pending");
+    expect(gradeLeg(td("Kenneth Walker III"), final(10, 7), box()).state).toBe("miss");
+  });
+
+  it("anytime TD does not credit the quarterback on a passing score", () => {
+    const passing = box({ tdPlays: ["tyler warren 12 yd pass from daniel jones (kick)"] });
+    expect(gradeLeg(td("Tyler Warren"), live(10, 7), passing).state).toBe("hit");
+    expect(gradeLeg(td("Daniel Jones"), final(10, 7), passing).state).toBe("miss");
+  });
+
+  it("a hand mark still wins", () => {
+    expect(gradeLeg({ ...cook(87.5), manual: "miss" }, final(10, 7), box({ rush: new Map([["james cook", 99]]) })).state).toBe("miss");
+  });
+});
+
+describe("normName", () => {
+  it("ignores suffixes, case, and punctuation", () => {
+    expect(normName("Kenneth Walker III")).toBe("kenneth walker");
+    expect(normName("Marvin Harrison Jr.")).toBe("marvin harrison");
+    expect(normName("D'Andre  Swift")).toBe("dandre swift");
+  });
+});
+
+describe("live clock", () => {
+  it("shows the game clock when the source has one", () => {
+    const leg = { ...base, side: "home" as const };
+    expect(gradeLeg(leg, { ...live(7, 3), clock: "Halftime" }).detail).toMatch(/^Live \(Halftime\):/);
   });
 });

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { ErrorBanner } from "@/components/error-banner";
 import { getLegs, isAdminKey, LIVE_PATH } from "@/lib/live/board";
+import { PROP_STATS } from "@/lib/live/grade";
 import { oddsProvider } from "@/lib/odds";
 import { formatPrice } from "@/lib/rules";
 import { addLeg, markLeg, removeLeg } from "./actions";
@@ -50,7 +51,8 @@ export default async function EditLive(props: PageProps<"/live-board/edit">) {
               </p>
               {leg.matchup && <p className="text-sm text-zinc-500">{leg.matchup}</p>}
               <p className="text-sm text-zinc-400">
-                Hand mark: {leg.manual ?? (leg.kind === "prop" ? "none (props need one)" : "none (auto)")}
+                Hand mark:{" "}
+                {leg.manual ?? (leg.kind === "prop" && !leg.prop ? "none (this prop needs one)" : "none (auto)")}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -138,19 +140,56 @@ export default async function EditLive(props: PageProps<"/live-board/edit">) {
           </div>
         </div>
 
-        <div>
-          <label className="label" htmlFor="label">
-            Prop player and line (props only)
-          </label>
-          <input id="label" name="label" className="input" placeholder="Patrick Mahomes Over 275.5" />
-        </div>
-
-        <div>
-          <label className="label" htmlFor="market">
-            Prop market (props only)
-          </label>
-          <input id="market" name="market" className="input" placeholder="Passing yds" />
-        </div>
+        <fieldset className="flex flex-col gap-3 rounded-lg border border-zinc-800 p-3">
+          <legend className="px-1 text-xs font-medium uppercase tracking-wide text-zinc-400">
+            Player props only
+          </legend>
+          <p className="text-xs text-zinc-500">
+            Pick a stat and the page grades it from the box score. The line goes in the Line box above.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label" htmlFor="stat">
+                Stat
+              </label>
+              <select id="stat" name="stat" className="input" defaultValue="">
+                <option value="">Hand-marked (fill in below)</option>
+                {Object.entries(PROP_STATS).map(([key, { label }]) => (
+                  <option key={key} value={key}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label" htmlFor="direction">
+                Over/Under (yards)
+              </label>
+              <select id="direction" name="direction" className="input" defaultValue="over">
+                <option value="over">Over</option>
+                <option value="under">Under</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="label" htmlFor="player">
+              Player (as ESPN spells it)
+            </label>
+            <input id="player" name="player" className="input" placeholder="Josh Allen" />
+          </div>
+          <div>
+            <label className="label" htmlFor="label">
+              Hand-marked: player and line
+            </label>
+            <input id="label" name="label" className="input" placeholder="Patrick Mahomes Over 275.5" />
+          </div>
+          <div>
+            <label className="label" htmlFor="market">
+              Hand-marked: market
+            </label>
+            <input id="market" name="market" className="input" placeholder="Passing yds" />
+          </div>
+        </fieldset>
 
         <div>
           <label className="label" htmlFor="price">
