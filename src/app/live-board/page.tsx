@@ -3,7 +3,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { getBoard, LIVE_PATH } from "@/lib/live/board";
-import { gradeLeg, parlayState, type Grade, type Leg, type LegKind, type LegState } from "@/lib/live/grade";
+import { gameIsLive, gradeLeg, parlayState, type Grade, type Leg, type LegKind, type LegState } from "@/lib/live/grade";
 import { legLogos } from "@/lib/live/logos";
 import { getScores } from "@/lib/live/scores";
 import { formatPrice, parlayPrice, toDecimal } from "@/lib/rules";
@@ -98,9 +98,14 @@ function Marker({ state }: { state: LegState }) {
   return <span className={`${base} ${ring}`} />;
 }
 
-function Logos({ urls }: { urls: string[] }) {
+// A green ring marks a game that's being played right now.
+function Logos({ urls, live }: { urls: string[]; live: boolean }) {
   return (
-    <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 ring-1 ring-zinc-800">
+    <div
+      className={`flex size-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 ring-2 ${
+        live ? "ring-emerald-500" : "ring-zinc-800"
+      }`}
+    >
       {urls.length === 0 ? null : urls.length === 1 ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={urls[0]} alt="" className="size-7 object-contain" loading="lazy" />
@@ -116,7 +121,7 @@ function Logos({ urls }: { urls: string[] }) {
   );
 }
 
-function LegRow({ leg, grade, settled }: { leg: Leg; grade: Grade; settled: boolean }) {
+function LegRow({ leg, grade, settled, live }: { leg: Leg; grade: Grade; settled: boolean; live: boolean }) {
   const accent = settled ? "text-zinc-100" : "text-blue-400";
   const status = grade.label ?? STATUS_TEXT[grade.state];
   return (
@@ -124,7 +129,7 @@ function LegRow({ leg, grade, settled }: { leg: Leg; grade: Grade; settled: bool
       <Marker state={grade.state} />
       <div className="min-w-0 flex-1 border-b border-zinc-800 py-3">
         <div className="flex items-center gap-3">
-          <Logos urls={legLogos(leg)} />
+          <Logos urls={legLogos(leg)} live={live} />
           <div className="min-w-0 flex-1">
             <p className={`truncate text-lg font-bold leading-tight ${accent}`}>{leg.label}</p>
             <p className="truncate text-xs font-medium uppercase tracking-widest text-zinc-400">
@@ -158,10 +163,14 @@ export default async function LiveParlay(props: PageProps<"/live-board">) {
 
   const { legs, totalPrice } = await getBoard();
   const { scores, boxes, backup, error } = await getScores(legs);
-  const graded = legs.map((leg) => ({
-    leg,
-    grade: gradeLeg(leg, leg.eventId ? scores.get(leg.eventId) : undefined, leg.eventId ? boxes.get(leg.eventId) : undefined),
-  }));
+  const graded = legs.map((leg) => {
+    const score = leg.eventId ? scores.get(leg.eventId) : undefined;
+    return {
+      leg,
+      grade: gradeLeg(leg, score, leg.eventId ? boxes.get(leg.eventId) : undefined),
+      live: gameIsLive(score),
+    };
+  });
 
   const state = parlayState(graded.map((g) => g.grade));
   const banner = BANNER[state];
@@ -235,8 +244,8 @@ export default async function LiveParlay(props: PageProps<"/live-board">) {
       <ul className="relative">
         {/* The timeline rail. The markers sit on top of it. */}
         {shown.length > 1 && <div className="absolute bottom-6 left-3 top-6 w-px bg-zinc-700" aria-hidden />}
-        {[...shown].sort(byKickoff).map(({ leg, grade }) => (
-          <LegRow key={leg.id} leg={leg} grade={grade} settled={view === "settled"} />
+        {[...shown].sort(byKickoff).map(({ leg, grade, live }) => (
+          <LegRow key={leg.id} leg={leg} grade={grade} settled={view === "settled"} live={live} />
         ))}
       </ul>
     </main>
