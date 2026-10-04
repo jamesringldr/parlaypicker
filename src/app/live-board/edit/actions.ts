@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { notFound, redirect } from "next/navigation";
 import { fail } from "@/lib/action-helpers";
 import { getLegs, isAdminKey, LIVE_PATH, saveLegs } from "@/lib/live/board";
-import type { Leg, LegKind, Manual } from "@/lib/live/grade";
+import { PROP_STATS, type Leg, type LegKind, type Manual, type PropStat } from "@/lib/live/grade";
 import { oddsProvider } from "@/lib/odds";
 
 const KINDS: LegKind[] = ["moneyline", "spread", "total", "prop"];
@@ -52,9 +52,24 @@ export async function addLeg(formData: FormData) {
   }
 
   if (kind === "prop") {
-    if (!propLabel) fail(back, "Name the player and line, e.g. Mahomes Over 275.5.");
-    const market = String(formData.get("market") ?? "").trim();
-    if (market) leg.market = market;
+    const stat = String(formData.get("stat") ?? "") as PropStat | "";
+    const player = String(formData.get("player") ?? "").trim();
+    const direction = String(formData.get("direction") ?? "over") === "under" ? "under" : "over";
+    if (stat) {
+      // Auto-graded from the box score.
+      if (!(stat in PROP_STATS)) fail(back, "Choose a stat.");
+      if (!player) fail(back, "Enter the player's name as ESPN spells it.");
+      const { label, yards } = PROP_STATS[stat];
+      if (yards && point === undefined) fail(back, "Enter the line.");
+      leg.prop = yards ? { player, stat, side: direction, point } : { player, stat };
+      leg.label = yards ? `${player} ${direction === "over" ? "Over" : "Under"} ${point}` : player;
+      leg.market = label;
+    } else {
+      // Hand-marked.
+      if (!propLabel) fail(back, "Name the player and line, e.g. Mahomes Over 275.5.");
+      const market = String(formData.get("market") ?? "").trim();
+      if (market) leg.market = market;
+    }
     // For props, home/away is the player's team (picks the logo).
     if (leg.eventId && (side === "home" || side === "away")) leg.team = side === "home" ? leg.homeTeam : leg.awayTeam;
   } else {
