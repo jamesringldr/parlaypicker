@@ -1,8 +1,7 @@
-import { mockOddsProvider } from "./mock";
+import { fanduelOddsProvider } from "./the-odds-api";
 import type { Market, Outcome, OddsProvider } from "./types";
 
-// Swap for the real sportsbook provider once the book is chosen.
-export const oddsProvider: OddsProvider = mockOddsProvider;
+export const oddsProvider: OddsProvider = fanduelOddsProvider;
 
 export const MARKET_LABELS: Record<string, string> = {
   h2h: "Moneyline",

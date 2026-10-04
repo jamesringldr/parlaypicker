@@ -27,7 +27,12 @@ export async function submitPick(formData: FormData) {
   if (viewer.id === current.parlay.better_id) fail(back, "The Better cannot make a pick.");
 
   // Price and line come from the provider, never from the form.
-  const event = await oddsProvider.getEventOdds(sport, eventId);
+  let event: Awaited<ReturnType<typeof oddsProvider.getEventOdds>>;
+  try {
+    event = await oddsProvider.getEventOdds(sport, eventId);
+  } catch (error) {
+    fail(back, error instanceof Error ? error.message : "Couldn't load FanDuel lines. Try again.");
+  }
   const outcome = event?.markets
     .find((m) => m.key === market)
     ?.outcomes.find(

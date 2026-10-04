@@ -15,10 +15,21 @@ export default async function PickLeg(props: PageProps<"/pick/[eventId]">) {
   const { sport } = await props.searchParams;
   if (!isSport(sport)) notFound();
 
-  const [event, profiles] = await Promise.all([
-    oddsProvider.getEventOdds(sport, decodeURIComponent(eventId)),
-    getProfiles(),
-  ]);
+  let event: Awaited<ReturnType<typeof oddsProvider.getEventOdds>>;
+  try {
+    event = await oddsProvider.getEventOdds(sport, decodeURIComponent(eventId));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Couldn't load lines.";
+    return (
+      <main className="flex flex-col gap-4">
+        <Link href={`/pick?sport=${sport}`} className="text-sm text-zinc-400 hover:text-zinc-200">
+          ← All games
+        </Link>
+        <p className="text-sm text-red-300">{message}</p>
+      </main>
+    );
+  }
+  const profiles = await getProfiles();
   if (!event) notFound();
 
   const nameOf = new Map(profiles.map((p) => [p.id, p.display_name]));
@@ -39,10 +50,8 @@ export default async function PickLeg(props: PageProps<"/pick/[eventId]">) {
         </p>
       </div>
 
-      {event.bookmaker === "mock" && (
-        <p className="rounded-lg border border-amber-900 bg-amber-950 px-3 py-2 text-xs text-amber-200">
-          Sample odds. No sportsbook is connected yet.
-        </p>
+      {event.markets.length === 0 && (
+        <p className="text-sm text-zinc-500">FanDuel has no lines up for this game yet.</p>
       )}
       <ErrorBanner searchParams={props.searchParams} />
       {started && <p className="text-sm text-red-300">This game has started. Picks are closed.</p>}
