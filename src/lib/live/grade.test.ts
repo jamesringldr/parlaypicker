@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { gradeLeg, normName, parlayState, type BoxScore, type GameScore, type Leg } from "./grade";
+import { gameIsLive, gradeLeg, normName, parlayState, type BoxScore, type GameScore, type Leg } from "./grade";
 
 const base: Leg = {
   id: "1",
@@ -188,5 +188,15 @@ describe("live clock", () => {
   it("shows the game clock when the source has one", () => {
     const leg = { ...base, side: "home" as const };
     expect(gradeLeg(leg, { ...live(7, 3), clock: "Halftime" }).detail).toMatch(/^Live \(Halftime\):/);
+  });
+});
+
+describe("gameIsLive", () => {
+  it("is true only between kickoff and the final", () => {
+    expect(gameIsLive(undefined)).toBe(false);
+    expect(gameIsLive({ completed: false, homeScore: null, awayScore: null })).toBe(false); // not kicked off
+    expect(gameIsLive({ completed: false, homeScore: 0, awayScore: 0 })).toBe(true); // just kicked off
+    expect(gameIsLive({ completed: false, homeScore: 7, awayScore: 3 })).toBe(true);
+    expect(gameIsLive({ completed: true, homeScore: 24, awayScore: 20 })).toBe(false);
   });
 });

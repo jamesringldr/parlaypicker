@@ -75,6 +75,11 @@ export function normName(name: string): string {
     .trim();
 }
 
+// Kicked off and not final. A 0-0 game that just started counts; one that hasn't kicked off doesn't.
+export function gameIsLive(score: GameScore | undefined): boolean {
+  return !!score && !score.completed && score.homeScore !== null && score.awayScore !== null;
+}
+
 export type LegState = "pending" | "winning" | "losing" | "hit" | "miss" | "push";
 
 export interface Grade {
