@@ -1,8 +1,7 @@
-import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { LocalTime } from "@/components/local-time";
-import { getLegs, isViewSlug } from "@/lib/live/board";
+import { getLegs } from "@/lib/live/board";
 import { gradeLeg, parlayState, type LegState } from "@/lib/live/grade";
 import { getScores } from "@/lib/live/scores";
 import { formatPrice, parlayPrice } from "@/lib/rules";
@@ -24,10 +23,8 @@ const BANNER = {
   won: { text: "Parlay hit! 🎉", className: "border-emerald-500/40 bg-emerald-950/40 text-emerald-200" },
 };
 
-export default async function LiveParlay(props: PageProps<"/live/[slug]">) {
+export default async function LiveParlay() {
   await connection();
-  const { slug } = await props.params;
-  if (!isViewSlug(slug)) notFound();
 
   const legs = await getLegs();
   const { scores, error } = await getScores(legs);

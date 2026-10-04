@@ -2,18 +2,17 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { ErrorBanner } from "@/components/error-banner";
-import { getLegs, isAdminKey, isViewSlug } from "@/lib/live/board";
+import { getLegs, isAdminKey, LIVE_PATH } from "@/lib/live/board";
 import { oddsProvider } from "@/lib/odds";
 import { formatPrice } from "@/lib/rules";
 import { addLeg, markLeg, removeLeg } from "./actions";
 
 export const metadata = { title: "Edit Live Parlay", robots: { index: false, follow: false } };
 
-export default async function EditLive(props: PageProps<"/live/[slug]/edit">) {
+export default async function EditLive(props: PageProps<"/low-t/live-board/edit">) {
   await connection();
-  const { slug } = await props.params;
   const { key } = await props.searchParams;
-  if (!isViewSlug(slug) || typeof key !== "string" || !isAdminKey(key)) notFound();
+  if (typeof key !== "string" || !isAdminKey(key)) notFound();
 
   const legs = await getLegs();
   let events: Awaited<ReturnType<typeof oddsProvider.listEvents>> = [];
@@ -26,7 +25,6 @@ export default async function EditLive(props: PageProps<"/live/[slug]/edit">) {
 
   const hidden = (
     <>
-      <input type="hidden" name="slug" value={slug} />
       <input type="hidden" name="key" value={key} />
     </>
   );
@@ -35,7 +33,7 @@ export default async function EditLive(props: PageProps<"/live/[slug]/edit">) {
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 px-4 py-6">
       <header className="flex items-center justify-between">
         <h1 className="text-xl font-bold tracking-tight">Edit live parlay</h1>
-        <Link href={`/live/${slug}`} className="btn-ghost">
+        <Link href={LIVE_PATH} className="btn-ghost">
           View page
         </Link>
       </header>

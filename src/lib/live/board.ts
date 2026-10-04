@@ -5,10 +5,8 @@ import type { Leg } from "./grade";
 
 const BOARD_ID = "current";
 
-// The page URL is /live/<LIVE_SLUG>. Unlisted, not secret-grade: anyone with the link can view.
-export function isViewSlug(slug: string) {
-  return !!process.env.LIVE_SLUG && slug === process.env.LIVE_SLUG;
-}
+// Unlisted, not secret: anyone who knows this path can view the board.
+export const LIVE_PATH = "/low-t/live-board";
 
 // Editing needs LIVE_ADMIN_KEY as well.
 export function isAdminKey(key: string | undefined) {
