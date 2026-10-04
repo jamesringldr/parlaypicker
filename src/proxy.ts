@@ -23,7 +23,9 @@ export async function proxy(request: NextRequest) {
 
   const { data } = await supabase.auth.getClaims();
 
-  if (!data?.claims && !request.nextUrl.pathname.startsWith("/login")) {
+  // /live is the unlisted shared tracker. It has its own slug and key checks.
+  const open = ["/login", "/live"].some((p) => request.nextUrl.pathname.startsWith(p));
+  if (!data?.claims && !open) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 

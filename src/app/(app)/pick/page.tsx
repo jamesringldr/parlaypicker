@@ -8,7 +8,14 @@ export default async function PickGame(props: PageProps<"/pick">) {
   await requirePicker();
   const { sport: param } = await props.searchParams;
   const sport = isSport(param) ? param : "nfl";
-  const events = await oddsProvider.listEvents(sport);
+
+  let events: Awaited<ReturnType<typeof oddsProvider.listEvents>> = [];
+  let oddsError: string | null = null;
+  try {
+    events = await oddsProvider.listEvents(sport);
+  } catch (error) {
+    oddsError = error instanceof Error ? error.message : "Couldn't load games.";
+  }
   const upcoming = events.filter((e) => new Date(e.commenceTime) > new Date());
 
   return (
@@ -31,7 +38,8 @@ export default async function PickGame(props: PageProps<"/pick">) {
       </div>
 
       <div className="flex flex-col gap-2">
-        {upcoming.length === 0 && <p className="text-sm text-zinc-500">No upcoming games.</p>}
+        {oddsError && <p className="text-sm text-red-300">{oddsError}</p>}
+        {!oddsError && upcoming.length === 0 && <p className="text-sm text-zinc-500">No upcoming games.</p>}
         {upcoming.map((e) => (
           <Link
             key={e.id}

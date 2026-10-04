@@ -18,14 +18,16 @@ Enforced in Postgres (`supabase/migrations/0001_init.sql`), so the UI can't rout
 
 ## Odds
 
-`src/lib/odds/index.ts` currently uses **mock odds** (`mock.ts`). The types in `types.ts` follow The Odds API v4 response shape. Once the sportsbook is chosen, add a provider that implements `OddsProvider` and swap it in.
+Lines come from FanDuel through [The Odds API](https://the-odds-api.com/) (`src/lib/odds/the-odds-api.ts`). The game list is free. Opening a game costs one credit per market FanDuel actually returns: moneyline, spread, total, and the four prop types. Alt lines are not requested. A response is reused for 2 minutes, so the page view and the pick that follows share one fetch.
+
+Set `ODDS_API_KEY` in `.env.local`. The feed is one national FanDuel line, and it can lag the phone app by a couple of minutes. The combined price on the home page is still this app's own math, not FanDuel's same-game parlay price.
 
 ## Setup
 
 1. Create a Supabase project.
 2. Run `supabase/migrations/0001_init.sql` in the SQL editor, or use `supabase link` then `supabase db push`.
 3. Go to **Auth → Email Templates → Magic Link** and add `{{ .Token }}` to the body. Sign-in uses a 6-digit code instead of a link, because links break on phones.
-4. `cp .env.example .env.local` and fill in the project URL, publishable key and secret key (**Project Settings → API Keys**).
+4. `cp .env.example .env.local` and fill in the project URL, publishable key, secret key (**Project Settings → API Keys**), and `ODDS_API_KEY`.
 5. `npm install && npm run dev`, then sign in once.
 6. Make yourself admin and a member in the SQL editor:
    ```sql
@@ -33,7 +35,7 @@ Enforced in Postgres (`supabase/migrations/0001_init.sql`), so the UI can't rout
    ```
 7. Others sign in, then you approve them on `/admin`. From there you open a parlay and set the Better.
 
-Deploy to Vercel with the same three env vars.
+Deploy to Vercel with the same four env vars.
 
 ## Scripts
 
