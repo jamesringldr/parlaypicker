@@ -1,7 +1,7 @@
 import { connection } from "next/server";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { LocalTime } from "@/components/local-time";
-import { getLegs } from "@/lib/live/board";
+import { getBoard } from "@/lib/live/board";
 import { gradeLeg, parlayState, type LegState } from "@/lib/live/grade";
 import { getScores } from "@/lib/live/scores";
 import { formatPrice, parlayPrice } from "@/lib/rules";
@@ -26,7 +26,7 @@ const BANNER = {
 export default async function LiveParlay() {
   await connection();
 
-  const legs = await getLegs();
+  const { legs, totalPrice } = await getBoard();
   const { scores, error } = await getScores(legs);
   const graded = legs.map((leg) => ({
     leg,
@@ -37,7 +37,8 @@ export default async function LiveParlay() {
   const banner = BANNER[state];
   const hits = graded.filter((g) => g.grade.state === "hit").length;
   const priced = legs.flatMap((l) => (l.price === undefined ? [] : [l.price]));
-  const combined = priced.length === legs.length ? parlayPrice(priced) : null;
+  // A hand-entered total (the sportsbook's real price) beats our own math.
+  const combined = totalPrice ?? (priced.length === legs.length ? parlayPrice(priced) : null);
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 px-4 py-6">

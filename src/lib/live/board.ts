@@ -17,14 +17,18 @@ export function isAdminKey(key: string | undefined) {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-export async function getLegs(): Promise<Leg[]> {
+export async function getBoard(): Promise<{ legs: Leg[]; totalPrice: number | null }> {
   const { data, error } = await createAdminClient()
     .from("live_board")
-    .select("legs")
+    .select("legs, total_price")
     .eq("id", BOARD_ID)
     .maybeSingle();
   if (error) throw new Error(`Couldn't load the board: ${error.message}`);
-  return (data?.legs as Leg[] | undefined) ?? [];
+  return { legs: (data?.legs as Leg[] | undefined) ?? [], totalPrice: data?.total_price ?? null };
+}
+
+export async function getLegs(): Promise<Leg[]> {
+  return (await getBoard()).legs;
 }
 
 export async function saveLegs(legs: Leg[]) {
