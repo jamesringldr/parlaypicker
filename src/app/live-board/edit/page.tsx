@@ -120,7 +120,7 @@ export default async function EditLive(props: PageProps<"/live-board/edit">) {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="label" htmlFor="side">
-              Side (not for props)
+              Side (props: the player&apos;s team)
             </label>
             <select id="side" name="side" className="input" defaultValue="">
               <option value="">—</option>
@@ -140,9 +140,16 @@ export default async function EditLive(props: PageProps<"/live-board/edit">) {
 
         <div>
           <label className="label" htmlFor="label">
-            Prop description (props only)
+            Prop player and line (props only)
           </label>
-          <input id="label" name="label" className="input" placeholder="Mahomes over 275.5 pass yds" />
+          <input id="label" name="label" className="input" placeholder="Patrick Mahomes Over 275.5" />
+        </div>
+
+        <div>
+          <label className="label" htmlFor="market">
+            Prop market (props only)
+          </label>
+          <input id="market" name="market" className="input" placeholder="Passing yds" />
         </div>
 
         <div>
