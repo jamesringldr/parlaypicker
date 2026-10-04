@@ -23,8 +23,8 @@ export async function proxy(request: NextRequest) {
 
   const { data } = await supabase.auth.getClaims();
 
-  // /low-t/live-board is the unlisted shared tracker. Its edit page checks a key.
-  const open = ["/login", "/low-t/live-board"].some((p) => request.nextUrl.pathname.startsWith(p));
+  // /live-board is the unlisted shared tracker. Its edit page checks a key.
+  const open = ["/login", "/live-board"].some((p) => request.nextUrl.pathname.startsWith(p));
   if (!data?.claims && !open) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
