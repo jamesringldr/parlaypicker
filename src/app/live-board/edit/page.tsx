@@ -9,7 +9,7 @@ import { addLeg, markLeg, removeLeg } from "./actions";
 
 export const metadata = { title: "Edit Live Parlay", robots: { index: false, follow: false } };
 
-export default async function EditLive(props: PageProps<"/low-t/live-board/edit">) {
+export default async function EditLive(props: PageProps<"/live-board/edit">) {
   await connection();
   const { key } = await props.searchParams;
   if (typeof key !== "string" || !isAdminKey(key)) notFound();
