@@ -52,7 +52,11 @@ export async function addLeg(formData: FormData) {
   }
 
   if (kind === "prop") {
-    if (!propLabel) fail(back, "Describe the prop, e.g. Mahomes over 275.5 pass yds.");
+    if (!propLabel) fail(back, "Name the player and line, e.g. Mahomes Over 275.5.");
+    const market = String(formData.get("market") ?? "").trim();
+    if (market) leg.market = market;
+    // For props, home/away is the player's team (picks the logo).
+    if (leg.eventId && (side === "home" || side === "away")) leg.team = side === "home" ? leg.homeTeam : leg.awayTeam;
   } else {
     if (!leg.eventId) fail(back, "Choose the game.");
     if (!SIDES.includes(side)) fail(back, "Choose a side.");
@@ -67,7 +71,7 @@ export async function addLeg(formData: FormData) {
     const team = side === "home" ? leg.homeTeam : leg.awayTeam;
     leg.label =
       kind === "moneyline"
-        ? `${team} ML`
+        ? `${team}`
         : kind === "spread"
           ? `${team} ${signed(point!)}`
           : `${side === "over" ? "Over" : "Under"} ${point}`;

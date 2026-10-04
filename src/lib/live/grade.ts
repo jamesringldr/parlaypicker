@@ -8,6 +8,10 @@ export interface Leg {
   owner: string;
   kind: LegKind;
   label: string;
+  // Line under the label, e.g. "Rushing yds". Defaults to the leg type.
+  market?: string;
+  // Which team a prop player is on (picks the logo). Game legs use `side`.
+  team?: string;
   price?: number; // American odds
   sport: Sport;
   // Game info. Required for ml/spread/total so they can be auto-graded; optional for props.
