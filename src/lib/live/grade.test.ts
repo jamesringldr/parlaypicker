@@ -13,7 +13,12 @@ const base: Leg = {
 };
 
 const final = (homeScore: number, awayScore: number): GameScore => ({ completed: true, homeScore, awayScore });
-const live = (homeScore: number, awayScore: number): GameScore => ({ completed: false, homeScore, awayScore });
+const live = (homeScore: number, awayScore: number, elapsed?: number): GameScore => ({
+  completed: false,
+  homeScore,
+  awayScore,
+  elapsed,
+});
 
 describe("gradeLeg", () => {
   it("is pending with no score", () => {
@@ -102,10 +107,51 @@ describe("player props", () => {
     expect(gradeLeg(cook(54), final(10, 7), box()).state).toBe("push");
   });
 
-  it("an under is losing once past the line", () => {
-    expect(gradeLeg(cook(87.5, "under"), live(10, 7), box()).state).toBe("winning");
+  it("an under busts once past the line and settles at the final", () => {
     expect(gradeLeg(cook(40, "under"), live(10, 7), box()).state).toBe("losing");
     expect(gradeLeg(cook(87.5, "under"), final(10, 7), box()).state).toBe("hit");
+  });
+
+  describe("pace", () => {
+    // Cook has 54 yards. Against 87.5 that's 62% of the line.
+    it("an over behind the share of the game played is off pace", () => {
+      const g = gradeLeg(cook(87.5), live(10, 7, 0.73), box());
+      expect(g).toMatchObject({ state: "losing", label: "Off pace" });
+      expect(g.detail).toBe("Live: 54 of 87.5 rush yds (62% of line, 73% of game)");
+    });
+
+    it("an over ahead of the share of the game played is on pace", () => {
+      expect(gradeLeg(cook(87.5), live(10, 7, 0.5), box())).toMatchObject({ state: "winning", label: "On pace" });
+      expect(gradeLeg(cook(87.5), live(10, 7, 0.6), box()).state).toBe("winning");
+      expect(gradeLeg(cook(87.5), live(10, 7, 54 / 87.5), box()).state).toBe("winning"); // exactly tied counts as on pace
+    });
+
+    it("an under is the mirror image", () => {
+      expect(gradeLeg(cook(87.5, "under"), live(10, 7, 0.73), box())).toMatchObject({ state: "winning", label: "On pace" });
+      expect(gradeLeg(cook(87.5, "under"), live(10, 7, 0.5), box())).toMatchObject({ state: "losing", label: "Off pace" });
+    });
+
+    it("waits until enough of the game is gone, and for a source with a clock", () => {
+      expect(gradeLeg(cook(87.5), live(10, 7, 0.1), box()).state).toBe("pending");
+      expect(gradeLeg(cook(87.5, "under"), live(10, 7, 0.1), box()).state).toBe("pending");
+      expect(gradeLeg(cook(87.5), live(10, 7, undefined), box()).state).toBe("pending");
+    });
+
+    it("past the line beats pace in both directions", () => {
+      const past = box({ rush: new Map([["james cook", 90]]) });
+      expect(gradeLeg(cook(87.5), live(10, 7, 0.1), past)).toMatchObject({ state: "winning", label: "Over the line" });
+      expect(gradeLeg(cook(87.5, "under"), live(10, 7, 0.9), past)).toMatchObject({ state: "losing", label: "Over the line" });
+    });
+
+    it("never settles before the final, however far behind", () => {
+      expect(gradeLeg(cook(200), live(10, 7, 0.99), box()).state).toBe("losing");
+      expect(gradeLeg(cook(200), final(10, 7), box()).state).toBe("miss");
+    });
+
+    it("leaves touchdown props alone", () => {
+      const td: Leg = { ...base, kind: "prop", prop: { player: "Nobody", stat: "anytime_td" } };
+      expect(gradeLeg(td, live(10, 7, 0.9), box()).state).toBe("pending");
+    });
   });
 
   it("a player with no stat line has 0 yards", () => {

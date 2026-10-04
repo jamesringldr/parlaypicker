@@ -18,6 +18,19 @@ const num = (v: unknown): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
+const QUARTER_SECONDS = 15 * 60;
+
+// How much of regulation is gone, 0 to 1, from the quarter and the clock ("7:58" left in the
+// 3rd = 0.62). Halftime is 0.5. Overtime counts as the whole game.
+export function elapsedShare(period: number | null, displayClock: unknown): number | undefined {
+  if (period === null || period < 1 || typeof displayClock !== "string") return undefined;
+  if (period > 4) return 1;
+  const [min, sec] = displayClock.split(":").map(Number);
+  if (!Number.isFinite(min) || !Number.isFinite(sec)) return undefined;
+  const left = Math.min(QUARTER_SECONDS, min * 60 + sec);
+  return ((period - 1) * QUARTER_SECONDS + (QUARTER_SECONDS - left)) / (4 * QUARTER_SECONDS);
+}
+
 export function parseScoreboard(json: unknown): EspnGame[] {
   if (!isObj(json)) return [];
   const games: EspnGame[] = [];
@@ -39,6 +52,7 @@ export function parseScoreboard(json: unknown): EspnGame[] {
     const state = type.state; // "pre" | "in" | "post"
     const started = state === "in" || state === "post";
     const completed = type.completed === true;
+    const elapsed = completed ? 1 : state === "in" ? elapsedShare(num(status.period), status.displayClock) : undefined;
 
     games.push({
       id: event.id,
@@ -50,6 +64,7 @@ export function parseScoreboard(json: unknown): EspnGame[] {
         homeScore: started ? num(home?.score) : null,
         awayScore: started ? num(away?.score) : null,
         clock: state === "in" && typeof type.shortDetail === "string" ? type.shortDetail : undefined,
+        elapsed,
       },
     });
   }

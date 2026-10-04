@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { parseBox, parseScoreboard } from "./espn-parse";
+import { elapsedShare, parseBox, parseScoreboard } from "./espn-parse";
 
 const scoreboard = {
   events: [
     {
       id: "1",
-      status: { type: { state: "in", completed: false, shortDetail: "7:58 - 3rd" } },
+      status: { period: 3, displayClock: "7:58", type: { state: "in", completed: false, shortDetail: "7:58 - 3rd" } },
       competitions: [
         {
           competitors: [
@@ -51,23 +51,39 @@ describe("parseScoreboard", () => {
       homeTeam: "Washington Commanders",
       awayTeam: "Indianapolis Colts",
       started: true,
-      score: { completed: false, homeScore: 13, awayScore: 17, clock: "7:58 - 3rd" },
+      score: { completed: false, homeScore: 13, awayScore: 17, clock: "7:58 - 3rd", elapsed: (2 * 900 + 422) / 3600 },
     });
   });
 
   it("hides the 0-0 placeholder before kickoff", () => {
     expect(games[1].started).toBe(false);
-    expect(games[1].score).toMatchObject({ homeScore: null, awayScore: null, completed: false });
+    expect(games[1].score).toMatchObject({ homeScore: null, awayScore: null, completed: false, elapsed: undefined });
   });
 
   it("marks finals complete and drops the clock", () => {
-    expect(games[2].score).toEqual({ completed: true, homeScore: 27, awayScore: 24, clock: undefined });
+    expect(games[2].score).toEqual({ completed: true, homeScore: 27, awayScore: 24, clock: undefined, elapsed: 1 });
   });
 
   it("returns nothing, not a crash, when the shape changes", () => {
     expect(parseScoreboard(null)).toEqual([]);
     expect(parseScoreboard({ events: [{ id: 1 }, "x", null] })).toEqual([]);
     expect(parseScoreboard({ nope: true })).toEqual([]);
+  });
+});
+
+describe("elapsedShare", () => {
+  it("measures how much of regulation is gone", () => {
+    expect(elapsedShare(1, "15:00")).toBe(0);
+    expect(elapsedShare(1, "7:30")).toBeCloseTo(0.125);
+    expect(elapsedShare(2, "0:00")).toBe(0.5); // halftime
+    expect(elapsedShare(3, "3:25")).toBeCloseTo((1800 + 695) / 3600);
+    expect(elapsedShare(4, "0:00")).toBe(1);
+  });
+  it("counts overtime as the whole game and shrugs off bad input", () => {
+    expect(elapsedShare(5, "10:00")).toBe(1);
+    expect(elapsedShare(null, "7:58")).toBeUndefined();
+    expect(elapsedShare(3, undefined)).toBeUndefined();
+    expect(elapsedShare(3, "soon")).toBeUndefined();
   });
 });
 
