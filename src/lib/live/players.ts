@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { PLAYERS, playerBySlug, sameOwner, tally, type Tally } from "@/lib/players";
 import { badges, type Badge } from "@/lib/stats";
 import { getBoard, getPastWeeks, type ArchivedLeg } from "./board";
-import { gradeLeg, type Grade, type Leg } from "./grade";
+import { gradeLeg, legScore, type Grade, type Leg } from "./grade";
 import { getScores } from "./scores";
 
 export interface PlayerWeek {
@@ -50,7 +50,7 @@ export async function getPlayerProfile(slug: string): Promise<PlayerProfile | nu
   const { scores, boxes } = await getScores(mine);
   const legs = mine.map((leg) => ({
     leg,
-    grade: gradeLeg(leg, leg.eventId ? scores.get(leg.eventId) : undefined, leg.eventId ? boxes.get(leg.eventId) : undefined),
+    grade: gradeLeg(leg, legScore(leg, scores), leg.eventId ? boxes.get(leg.eventId) : undefined),
   }));
   // Archiving numbers the board's week as the one after the last archived week.
   const currentWeek = Math.max(0, ...past.map((w) => w.weekNumber)) + 1;

@@ -49,6 +49,9 @@ describe("matchupLine", () => {
     expect(matchupLine({ ...nepBuf, sport: "ncaaf", matchup: "Pittsburgh @ Virginia Tech" }, undefined)).toBe(
       "Pittsburgh @ Virginia Tech",
     );
+    expect(
+      matchupLine({ ...nepBuf, sport: "ncaaf", homeTeam: "Indiana", awayTeam: "Ohio State", matchup: "Ohio State @ Indiana" }, score(17, 20)),
+    ).toBe("Ohio State 20 - 17 Indiana");
     expect(matchupLine({ id: "1", owner: "t", kind: "prop", label: "", sport: "nfl", matchup: "x @ y" }, undefined)).toBe(
       "x @ y",
     );
