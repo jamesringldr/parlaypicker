@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, House, Radio, UserRound } from "lucide-react";
+import { CalendarDays, House, Receipt, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -12,7 +12,7 @@ export function AppBar({ me }: { me: string | null }) {
   const tabs = [
     { label: "Home", href: "/", icon: House, active: pathname === "/" },
     { label: "Games", href: "/games", icon: CalendarDays, active: pathname.startsWith("/games") },
-    { label: "Live Board", href: "/live-board", icon: Radio, active: pathname.startsWith("/live-board") },
+    { label: "Bet Slip", href: "/live-board", icon: Receipt, active: pathname.startsWith("/live-board") },
     { label: "My Legs", href: me ? `/${me}` : "/login", icon: UserRound, active: !!me && pathname === `/${me}` },
   ];
 
@@ -31,7 +31,8 @@ export function AppBar({ me }: { me: string | null }) {
                 active ? "text-emerald-400" : "text-zinc-400 hover:text-zinc-200"
               }`}
             >
-              <Icon className="size-5" aria-hidden />
+              {/* Lucide has no solid icons, so the active one is filled and its inner lines are cut out in the bar colour. */}
+              <Icon className={`size-5 ${active ? "fill-current stroke-zinc-950" : ""}`} aria-hidden />
               {label}
             </Link>
           </li>

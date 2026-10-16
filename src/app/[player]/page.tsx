@@ -5,9 +5,10 @@ import { connection } from "next/server";
 import { Avatar } from "@/components/avatar";
 import { signOutPlayer } from "@/app/login/actions";
 import { LIVE_PATH, type ArchivedLeg } from "@/lib/live/board";
-import { getPlayerProfile, getRoster } from "@/lib/live/players";
+import { getBadges, getPlayerProfile, getRoster } from "@/lib/live/players";
 import { formatRecord, hitRate, playerBySlug } from "@/lib/players";
 import { formatPrice } from "@/lib/rules";
+import { BADGE_EMOJI } from "@/lib/stats";
 
 const RESULT = {
   hit: { text: "Hit", className: "text-emerald-400" },
@@ -44,7 +45,8 @@ function LegLine({ leg }: { leg: ArchivedLeg }) {
 export default async function PlayerPage(props: PageProps<"/[player]">) {
   await connection();
   const { player: slug } = await props.params;
-  const [profile, roster] = await Promise.all([getPlayerProfile(slug), getRoster()]);
+  const [profile, roster, badges] = await Promise.all([getPlayerProfile(slug), getRoster(), getBadges()]);
+  const emoji = (s: string) => (badges.has(s) ? BADGE_EMOJI[badges.get(s)!] : undefined);
   if (!profile) notFound();
   const others = roster.filter((p) => p.slug !== slug.toLowerCase());
 
@@ -58,7 +60,7 @@ export default async function PlayerPage(props: PageProps<"/[player]">) {
       </Link>
 
       <header className="flex items-center gap-4">
-        <Avatar name={profile.name} photoUrl={profile.photoUrl} />
+        <Avatar name={profile.name} photoUrl={profile.photoUrl} badge={emoji(slug.toLowerCase())} badgeClass="text-2xl" />
         <div className="min-w-0">
           <h1 className="text-2xl font-bold tracking-tight">{profile.name}</h1>
           {profile.fantasyName && <p className="truncate text-sm text-zinc-400">{profile.fantasyName}</p>}
@@ -130,7 +132,7 @@ export default async function PlayerPage(props: PageProps<"/[player]">) {
           {others.map((p) => (
             <li key={p.slug} className="shrink-0 snap-start">
               <Link href={`/${p.slug}`} className="flex w-20 flex-col items-center gap-1.5 hover:opacity-80">
-                <Avatar name={p.name} photoUrl={p.photoUrl} className="size-16 text-2xl" />
+                <Avatar name={p.name} photoUrl={p.photoUrl} className="size-16 text-2xl" badge={emoji(p.slug)} badgeClass="text-lg" />
                 <span className="w-full truncate text-center text-xs font-semibold text-zinc-300">{p.name}</span>
               </Link>
             </li>

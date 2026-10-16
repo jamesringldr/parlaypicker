@@ -1,6 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/server";
 import { PLAYERS, playerBySlug, sameOwner, tally, type Tally } from "@/lib/players";
+import { badges, type Badge } from "@/lib/stats";
 import { getBoard, getPastWeeks, type ArchivedLeg } from "./board";
 import { gradeLeg, type Grade, type Leg } from "./grade";
 import { getScores } from "./scores";
@@ -76,4 +77,9 @@ export async function getRoster(): Promise<RosterEntry[]> {
   if (error) throw new Error(`Couldn't load the roster: ${error.message}`);
   const photos = new Map(data.map((r) => [r.slug as string, r.photo_url as string | null]));
   return PLAYERS.map((p) => ({ ...p, photoUrl: photos.get(p.slug) ?? null }));
+}
+
+// Fire and ice badges for everyone, from the archived weeks.
+export async function getBadges(): Promise<Map<string, Badge>> {
+  return badges(await getPastWeeks());
 }
