@@ -236,7 +236,10 @@ export default async function LiveParlay(props: PageProps<"/live-board">) {
           )}
         </div>
         <p className="text-sm text-zinc-500">
-          {hits} of {legs.length} legs hit{combined !== null && <> · pays {formatPrice(combined)}</>} · updates every
+          <Link href={`${LIVE_PATH}/past-weeks`} className="text-blue-400 hover:underline">
+            Past weeks
+          </Link>{" "}
+          · {hits} of {legs.length} legs hit{combined !== null && <> · pays {formatPrice(combined)}</>} · updates every
           30s
         </p>
       </header>
