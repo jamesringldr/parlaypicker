@@ -44,6 +44,7 @@ export type ArchivedLeg = Leg & { result: Manual; detail: string };
 
 export interface PastWeek {
   id: string;
+  weekNumber: number;
   weekOf: string; // YYYY-MM-DD
   legs: ArchivedLeg[];
   totalPrice: number | null;
@@ -69,7 +70,15 @@ export async function archiveBoard(): Promise<string | null> {
   const weekOf = centralDate.format(new Date(kickoffs[0] ?? Date.now()));
 
   const db = createAdminClient();
-  const { error } = await db.from("live_board_weeks").insert({ week_of: weekOf, legs: frozen, total_price: totalPrice });
+  const { data: last } = await db
+    .from("live_board_weeks")
+    .select("week_number")
+    .order("week_number", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const { error } = await db
+    .from("live_board_weeks")
+    .insert({ week_number: (last?.week_number ?? 0) + 1, week_of: weekOf, legs: frozen, total_price: totalPrice });
   if (error) return `Couldn't archive the board: ${error.message}`;
   const { error: clearError } = await db
     .from("live_board")
@@ -81,11 +90,12 @@ export async function archiveBoard(): Promise<string | null> {
 export async function getPastWeeks(): Promise<PastWeek[]> {
   const { data, error } = await createAdminClient()
     .from("live_board_weeks")
-    .select("id, week_of, legs, total_price")
-    .order("week_of", { ascending: false });
+    .select("id, week_number, week_of, legs, total_price")
+    .order("week_number", { ascending: false });
   if (error) throw new Error(`Couldn't load past weeks: ${error.message}`);
   return (data ?? []).map((r) => ({
     id: r.id,
+    weekNumber: r.week_number,
     weekOf: r.week_of,
     legs: r.legs as ArchivedLeg[],
     totalPrice: r.total_price,

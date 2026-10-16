@@ -20,16 +20,6 @@ const RESULT = {
   push: { text: "Push", className: "text-zinc-300" },
 };
 
-// "2026-10-04" as a calendar date, not a moment, so no timezone shifts it.
-function weekTitle(weekOf: string) {
-  const [y, m, d] = weekOf.split("-").map(Number);
-  return `Week of ${new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  })}`;
-}
-
 function LegLine({ leg }: { leg: ArchivedLeg }) {
   const result = RESULT[leg.result];
   return (
@@ -72,7 +62,7 @@ export default async function PastWeeks() {
         return (
           <section key={week.id} className="card flex flex-col gap-2">
             <div className="flex items-baseline justify-between gap-3">
-              <h2 className="font-bold">{weekTitle(week.weekOf)}</h2>
+              <h2 className="font-bold">Week {week.weekNumber}</h2>
               <p className={`font-bold ${won ? "text-emerald-400" : "text-red-400"}`}>
                 {won ? (profit === null ? "Hit 🎉" : `Won ${money.format(profit)} 🎉`) : "Lost"}
               </p>
