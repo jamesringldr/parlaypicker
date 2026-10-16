@@ -28,7 +28,7 @@ export async function signInWithPin(formData: FormData) {
   const lockedFor = attempts?.locked_until ? new Date(attempts.locked_until).getTime() - Date.now() : 0;
   if (lockedFor > 0) fail(back, `Too many wrong tries. Try again in ${Math.ceil(lockedFor / 60000)} min.`);
 
-  const { data: players, error } = await db.from("player_profiles").select("slug, pin_hash").not("pin_hash", "is", null);
+  const { data: players, error } = await db.from("player_profiles").select("slug, pin_hash, login_count, first_login_at").not("pin_hash", "is", null);
   if (error) fail(back, "Something went wrong. Try again.");
   const match = players.find((p) => verifyPin(pin, p.pin_hash as string));
 
@@ -44,6 +44,19 @@ export async function signInWithPin(formData: FormData) {
   }
 
   if (attempts) await db.from("login_attempts").delete().eq("ip", ip);
+
+  // Note the sign-in for the Activity page. Never let tracking stop someone from getting in.
+  const now = new Date().toISOString();
+  await db
+    .from("player_profiles")
+    .update({
+      first_login_at: match.first_login_at ?? now,
+      last_login_at: now,
+      last_seen_at: now,
+      login_count: ((match.login_count as number | null) ?? 0) + 1,
+    })
+    .eq("slug", match.slug)
+    .then(undefined, () => undefined);
   (await cookies()).set(SESSION_COOKIE, signSession(match.slug as string), sessionCookieOptions);
   redirect(next ?? `/${match.slug}`);
 }

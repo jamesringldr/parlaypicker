@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Avatar } from "@/components/avatar";
 import { LIVE_PATH, type ArchivedLeg } from "@/lib/live/board";
+import { getRole } from "@/lib/live/activity-store";
 import { getBadges, getPlayerProfile, getRoster } from "@/lib/live/players";
 import { formatRecord, hitRate, playerBySlug } from "@/lib/players";
 import { formatPrice } from "@/lib/rules";
@@ -54,7 +55,10 @@ export default async function PlayerPage(props: PageProps<"/[player]">) {
   const { record } = profile;
   const rate = hitRate(record);
   // "My Legs" on your own page. On someone else's it's theirs.
-  const isOwn = readSession((await cookies()).get(SESSION_COOKIE)?.value) === slug.toLowerCase();
+  const me = readSession((await cookies()).get(SESSION_COOKIE)?.value);
+  const isOwn = me === slug.toLowerCase();
+  // Only the super admin gets the Activity link, and only on their own page.
+  const showActivity = isOwn && (await getRole(me)) === "super_admin";
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 px-4 pb-28 pt-6">
@@ -76,6 +80,12 @@ export default async function PlayerPage(props: PageProps<"/[player]">) {
           {rate !== null && <p className="text-xs text-zinc-400">{Math.round(rate * 100)}% hit rate</p>}
         </div>
       </section>
+
+      {showActivity && (
+        <Link href="/activity" className="-mt-2 self-end text-xs text-blue-400 hover:underline">
+          Activity
+        </Link>
+      )}
 
       {profile.current.legs.length > 0 && (
         <section className="card flex flex-col">
