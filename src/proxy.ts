@@ -37,7 +37,7 @@ export async function proxy(request: NextRequest) {
     }
   } else {
     // /live-board is the unlisted shared tracker. Its edit page checks a key.
-    const open = ["/login", "/live-board", "/players/"].some((p) => pathname.startsWith(p));
+    const open = ["/login", "/live-board", "/players/", "/api/cron/"].some((p) => pathname.startsWith(p));
     if (!data?.claims && !open) {
       return NextResponse.redirect(new URL("/login", request.url));
     }

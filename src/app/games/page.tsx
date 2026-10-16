@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { CalendarDays, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { connection } from "next/server";
 import { AutoRefresh } from "@/components/auto-refresh";
@@ -12,36 +12,13 @@ import {
   type CollegeFilter,
   type Slate,
 } from "@/lib/games/scoreboard";
+import { isPropTab, PROP_TABS, type PropTab } from "@/lib/odds/props";
+import { getTabProps, type TabProps } from "@/lib/odds/props-store";
 import { formatPrice } from "@/lib/rules";
+import { PropsView } from "./props-view";
+import { kickoffLabel, Line, signed } from "./shared";
 
 export const metadata: Metadata = { title: "Games | Low-T Parlay", robots: { index: false, follow: false } };
-
-// "Sun 10/18 8:30am", in Central time like the rest of the site.
-function kickoffLabel(iso: string): string {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    weekday: "short",
-    month: "numeric",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-    timeZone: "America/Chicago",
-  }).formatToParts(new Date(iso));
-  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
-  return `${get("weekday")} ${get("month")}/${get("day")} ${get("hour")}:${get("minute")}${get("dayPeriod").toLowerCase()}`;
-}
-
-const signed = (n: number) => (n > 0 ? `+${n}` : `${n}`);
-
-// One tappable-looking line: the number on top, the price under it.
-function Line({ top, bottom }: { top: string; bottom: string }) {
-  return (
-    <div className="w-[4.1rem] shrink-0 rounded-lg bg-zinc-800 py-1.5 text-center">
-      <p className="text-sm font-bold leading-tight">{top}</p>
-      <p className="text-xs leading-tight text-zinc-400">{bottom}</p>
-    </div>
-  );
-}
 
 const spreadLine = (p: Price | null) =>
   p ? <Line top={p.line === null ? "-" : signed(p.line)} bottom={formatPrice(p.odds)} /> : <Line top="-" bottom="" />;
@@ -130,18 +107,6 @@ const TABS = [
   { key: "ncaa", label: "NCAA", href: "/games?sport=ncaa" },
 ];
 
-// Only Game Lines is live. The prop tabs need FanDuel's player markets, which come from the paid Odds API.
-const MARKETS = ["Game Lines", "TDs", "Passing", "Rushing", "Receiving"];
-
-function WeekTitle({ week }: { week: number }) {
-  return (
-    <h1 className="flex items-center gap-2 text-xl font-bold tracking-tight">
-      <CalendarDays className="size-5 text-zinc-400" aria-hidden />
-      Week {week}
-    </h1>
-  );
-}
-
 const FILTERS: { key: CollegeFilter; label: string }[] = [
   { key: "top25", label: "Top 25" },
   ...CONFERENCES.map((c) => ({ key: c.key, label: c.label })),
@@ -149,14 +114,17 @@ const FILTERS: { key: CollegeFilter; label: string }[] = [
 
 export default async function Games(props: PageProps<"/games">) {
   await connection();
-  const { sport, conf } = await props.searchParams;
+  const { sport, conf, tab } = await props.searchParams;
   const ncaa = sport === "ncaa";
+  const propTab: PropTab | null = !ncaa && isPropTab(tab) ? tab : null;
   const filter: CollegeFilter = isCollegeFilter(conf) ? conf : "top25";
 
   let data: Slate | null = null;
+  let propsData: TabProps | null = null;
   let error: string | null = null;
   try {
-    data = ncaa ? await getCollegeSlate(filter) : await getNflSlate();
+    if (propTab) propsData = await getTabProps(propTab);
+    else data = ncaa ? await getCollegeSlate(filter) : await getNflSlate();
   } catch (e) {
     error = e instanceof Error ? e.message : "Couldn't load the games.";
   }
@@ -165,11 +133,28 @@ export default async function Games(props: PageProps<"/games">) {
   const live = games.filter((g) => g.state === "in");
   const upcoming = games.filter((g) => g.state === "pre");
   const final = games.filter((g) => g.state === "post");
-  const markets = ncaa ? MARKETS.slice(0, 1) : MARKETS;
+  // Game Lines for both leagues. Player props are NFL only.
+  const markets = [
+    { label: "Game Lines", href: "/games", active: propTab === null },
+    ...(ncaa
+      ? []
+      : (Object.keys(PROP_TABS) as PropTab[]).map((k) => ({
+          label: PROP_TABS[k].label,
+          href: `/games?tab=${k}`,
+          active: propTab === k,
+        }))),
+  ];
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 px-4 py-6">
       {live.length > 0 && <AutoRefresh />}
+
+      <header className="flex items-center justify-between gap-3">
+        <h1 className="text-xl font-bold tracking-tight">This Week&apos;s Board</h1>
+        <Link href="/bet-slip" className="btn shrink-0">
+          Bet Slip
+        </Link>
+      </header>
 
       <nav className="flex gap-1 rounded-xl bg-zinc-900 p-1" aria-label="League">
         {TABS.map((t) => (
@@ -188,16 +173,19 @@ export default async function Games(props: PageProps<"/games">) {
       </nav>
 
       <div className="-mx-4 flex gap-6 overflow-x-auto border-b border-zinc-800 px-4">
-        {markets.map((m, i) => (
-          <span
-            key={m}
-            title={i === 0 ? undefined : "Coming soon"}
+        {markets.map((m) => (
+          <Link
+            key={m.label}
+            href={m.href}
+            replace
+            scroll={false}
+            aria-current={m.active ? "page" : undefined}
             className={`shrink-0 whitespace-nowrap border-b-4 pb-3 text-lg font-semibold ${
-              i === 0 ? "border-emerald-500 text-zinc-50" : "border-transparent text-zinc-600"
+              m.active ? "border-emerald-500 text-zinc-50" : "border-transparent text-zinc-400 hover:text-zinc-200"
             }`}
           >
-            {m}
-          </span>
+            {m.label}
+          </Link>
         ))}
       </div>
 
@@ -222,7 +210,7 @@ export default async function Games(props: PageProps<"/games">) {
         </nav>
       )}
 
-      {data && <WeekTitle week={data.week} />}
+      {propTab && !error && <PropsView tab={propTab} props={propsData} />}
       {error && <p className="card text-sm text-amber-300">Games are unavailable right now ({error}).</p>}
       {data && games.length === 0 && (
         <p className="card text-sm text-zinc-400">{ncaa && filter === "top25" ? "No ranked teams play this week." : "No games this week."}</p>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseGames, parseWeekNumber } from "./espn-games";
+import { parseGames } from "./espn-games";
 
 const side = (homeAway: string, abbr: string, record: string, score = "0", rank?: number) => ({
   homeAway,
@@ -82,12 +82,5 @@ describe("rankings", () => {
 
   it("has no rank when ESPN sends none", () => {
     expect(parseGames({ events: [ranked(undefined, undefined)] })[0].home.rank).toBeNull();
-  });
-});
-
-describe("parseWeekNumber", () => {
-  it("reads the week", () => {
-    expect(parseWeekNumber({ week: { number: 6 } })).toBe(6);
-    expect(parseWeekNumber({})).toBeNull();
   });
 });
