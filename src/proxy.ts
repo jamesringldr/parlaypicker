@@ -28,8 +28,8 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const player = readSession(request.cookies.get(SESSION_COOKIE)?.value);
 
-  // The stats home, Games and player profiles (/rodgers) need a PIN sign-in. Photos stay open.
-  if (pathname === "/" || pathname.startsWith("/games") || playerBySlug(pathname.slice(1))) {
+  // The stats home, Games, Bet Slip and player profiles (/rodgers) need a PIN sign-in. Photos stay open.
+  if (pathname === "/" || pathname.startsWith("/games") || pathname.startsWith("/bet-slip") || playerBySlug(pathname.slice(1))) {
     if (!player) {
       const login = new URL("/login", request.url);
       login.searchParams.set("next", pathname);

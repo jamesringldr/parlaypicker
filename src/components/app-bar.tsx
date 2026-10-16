@@ -12,7 +12,7 @@ export function AppBar({ me }: { me: string | null }) {
   const tabs = [
     { label: "Home", href: "/", icon: House, active: pathname === "/" },
     { label: "Games", href: "/games", icon: CalendarDays, active: pathname.startsWith("/games") },
-    { label: "Bet Slip", href: "/live-board", icon: Receipt, active: pathname.startsWith("/live-board") },
+    { label: "Bet Slip", href: "/bet-slip", icon: Receipt, active: pathname.startsWith("/bet-slip") },
     { label: "My Legs", href: me ? `/${me}` : "/login", icon: UserRound, active: !!me && pathname === `/${me}` },
   ];
 

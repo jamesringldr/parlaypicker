@@ -37,6 +37,14 @@ export function parlayPrice(prices: number[]): number | null {
   return toAmerican(prices.reduce((acc, p) => acc * toDecimal(p), 1));
 }
 
+// The group always bets $5.
+export const STAKE = 5;
+
+// Profit on the stake at these odds, not the payout (which includes the stake back).
+export function toWin(american: number): number {
+  return Math.round(STAKE * (toDecimal(american) - 1) * 100) / 100;
+}
+
 export function formatPrice(american: number): string {
   return american > 0 ? `+${american}` : `${american}`;
 }
