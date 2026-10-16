@@ -2,12 +2,15 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
 import { AutoRefresh } from "@/components/auto-refresh";
+import { Avatar } from "@/components/avatar";
 import { KickoffTime } from "@/components/kickoff-time";
 import { getBoard, LIVE_PATH } from "@/lib/live/board";
 import { gameIsLive, gradeLeg, parlayState, type Grade, type Leg, type LegKind, type LegState } from "@/lib/live/grade";
 import { legLogos } from "@/lib/live/logos";
+import { getRoster } from "@/lib/live/players";
 import { getScores } from "@/lib/live/scores";
 import { matchupLine } from "@/lib/live/teams";
+import { sameOwner } from "@/lib/players";
 import { formatPrice, parlayPrice, toDecimal } from "@/lib/rules";
 
 // The group always bets $5.
@@ -132,6 +135,7 @@ function LegRow({
   final,
   matchup,
   renderedAt,
+  photoUrl,
 }: {
   leg: Leg;
   grade: Grade;
@@ -141,9 +145,13 @@ function LegRow({
   final: boolean;
   matchup: string;
   renderedAt: number;
+  // The owner's profile photo, when they have one.
+  photoUrl: string | null;
 }) {
   const accent = settled ? "text-zinc-100" : "text-blue-400";
   const status = grade.label ?? STATUS_TEXT[grade.state];
+  // Before kickoff the start time already says it.
+  const detail = grade.detail === "Not started" ? "" : grade.detail;
   return (
     <li className="flex gap-3">
       <Marker state={grade.state} />
@@ -154,29 +162,44 @@ function LegRow({
             <p className={`truncate text-lg font-bold leading-tight ${accent}`}>{leg.label}</p>
             <p className="truncate text-xs font-medium uppercase tracking-widest text-zinc-400">
               {leg.market ?? KIND_LABEL[leg.kind]}
+              {leg.price !== undefined && <span className="ml-1.5 font-bold text-zinc-200">{formatPrice(leg.price)}</span>}
             </p>
           </div>
-          {leg.price !== undefined && <p className="shrink-0 text-xl font-bold">{formatPrice(leg.price)}</p>}
+          <div className="flex shrink-0 items-center gap-1.5 self-start pt-0.5">
+            <Avatar name={leg.owner} photoUrl={photoUrl} className="size-6 text-xs" />
+            <span className="text-sm font-semibold text-zinc-200">{leg.owner}</span>
+          </div>
         </div>
-        <div className="mt-2 flex items-baseline justify-between gap-3 text-sm">
-          <p className={`min-w-0 truncate ${accent}`}>{matchup}</p>
-          {leg.commenceTime && (
-            <p className="shrink-0 text-xs uppercase tracking-wide text-zinc-400">
-              <KickoffTime
-                kickoff={leg.commenceTime}
-                scheduled={`${centralTime.format(new Date(leg.commenceTime))} CT`}
-                live={clock}
-                final={final}
-                renderedAt={renderedAt}
-              />
-            </p>
-          )}
-        </div>
-        <p className="mt-1 text-xs text-zinc-400">
-          <span className="font-semibold text-zinc-200">{leg.owner}</span>
-          {status && <span className={`ml-2 font-semibold ${STATUS_COLOR[grade.state]}`}>{status}</span>}
-          {grade.detail && <span className="ml-2">{grade.detail}</span>}
-        </p>
+        {/* Before kickoff the start time sits under the matchup. Once it's on, the clock takes the right side. */}
+        {(() => {
+          const kickoff = leg.commenceTime && (
+            <KickoffTime
+              kickoff={leg.commenceTime}
+              scheduled={`${centralTime.format(new Date(leg.commenceTime))} CT`}
+              live={clock}
+              final={final}
+              renderedAt={renderedAt}
+            />
+          );
+          const started = live || final;
+          return started ? (
+            <div className="mt-2 flex items-baseline justify-between gap-3 text-sm">
+              <p className={`min-w-0 truncate ${accent}`}>{matchup}</p>
+              {kickoff && <p className="shrink-0 text-xs uppercase tracking-wide text-zinc-400">{kickoff}</p>}
+            </div>
+          ) : (
+            <div className="mt-2 text-sm">
+              <p className={`truncate ${accent}`}>{matchup}</p>
+              {kickoff && <p className="text-xs uppercase tracking-wide text-zinc-400">{kickoff}</p>}
+            </div>
+          );
+        })()}
+        {(status || detail) && (
+          <p className="mt-1 text-xs text-zinc-400">
+            {status && <span className={`font-semibold ${STATUS_COLOR[grade.state]}`}>{status}</span>}
+            {detail && <span className={status ? "ml-2" : ""}>{detail}</span>}
+          </p>
+        )}
       </div>
     </li>
   );
@@ -188,7 +211,8 @@ export default async function LiveParlay(props: PageProps<"/live-board">) {
   const view = tab === "settled" ? "settled" : "open";
 
   const { legs, totalPrice } = await getBoard();
-  const { scores, boxes, backup, error, at: renderedAt } = await getScores(legs);
+  const [{ scores, boxes, backup, error, at: renderedAt }, roster] = await Promise.all([getScores(legs), getRoster()]);
+  const photoOf = (owner: string) => roster.find((p) => sameOwner(p.name, owner))?.photoUrl ?? null;
   const graded = legs.map((leg) => {
     const score = leg.eventId ? scores.get(leg.eventId) : undefined;
     return {
@@ -288,6 +312,7 @@ export default async function LiveParlay(props: PageProps<"/live-board">) {
             final={final}
             matchup={matchup}
             renderedAt={renderedAt}
+            photoUrl={photoOf(leg.owner)}
           />
         ))}
       </ul>
