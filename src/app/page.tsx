@@ -4,28 +4,30 @@ import { connection } from "next/server";
 import { Avatar } from "@/components/avatar";
 import { getPastWeeks } from "@/lib/live/board";
 import { getRoster } from "@/lib/live/players";
-import { formatRecord, tally } from "@/lib/players";
-import { toDecimal } from "@/lib/rules";
-import { bestAndWorstWeek, extremes, standings, summarizeWeeks, type Standing } from "@/lib/stats";
+import { formatRecord } from "@/lib/players";
+import { badges as streakBadges, BADGE_EMOJI, extremes, standings, type Badge, type Standing } from "@/lib/stats";
 
-// The group always bets $5.
-const STAKE = 5;
-
-const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 const percent = (rate: number | null) => (rate === null ? "-" : `${Math.round(rate * 100)}%`);
 
 export const metadata: Metadata = { title: "Low-T Parlay", robots: { index: false, follow: false } };
+
+const badgeOf = (badges: Map<string, Badge>, slug: string) => {
+  const badge = badges.get(slug);
+  return badge ? BADGE_EMOJI[badge] : undefined;
+};
 
 function PickerCard({
   title,
   tone,
   rows,
   photos,
+  badges,
 }: {
   title: string;
   tone: string;
   rows: Standing[];
   photos: Map<string, string | null>;
+  badges: Map<string, Badge>;
 }) {
   return (
     <section className="card flex flex-col gap-2">
@@ -35,7 +37,12 @@ function PickerCard({
       ) : (
         rows.map((r) => (
           <Link key={r.slug} href={`/${r.slug}`} className="flex items-center gap-3 hover:opacity-80">
-            <Avatar name={r.name} photoUrl={photos.get(r.slug) ?? null} className="size-12 text-lg" />
+            <Avatar
+              name={r.name}
+              photoUrl={photos.get(r.slug) ?? null}
+              className="size-12 text-lg"
+              badge={badgeOf(badges, r.slug)}
+            />
             <div className="min-w-0">
               <p className="truncate font-bold">{r.name}</p>
               <p className="text-xs text-zinc-400">
@@ -54,20 +61,10 @@ export default async function Home() {
   const [weeks, roster] = await Promise.all([getPastWeeks(), getRoster()]);
   const photos = new Map(roster.map((p) => [p.slug, p.photoUrl]));
 
-  const results = weeks.map((w) => ({ weekNumber: w.weekNumber, totalPrice: w.totalPrice, legs: w.legs }));
+  const results = weeks.map((w) => ({ weekNumber: w.weekNumber, legs: w.legs }));
   const rows = standings(results);
   const { best, worst } = extremes(rows);
-  const summaries = summarizeWeeks(results);
-  const { best: bestWeek, worst: worstWeek } = bestAndWorstWeek(summaries);
-
-  const legRecord = tally(weeks.flatMap((w) => w.legs.map((l) => l.result)));
-  const decided = legRecord.wins + legRecord.losses;
-  const wonWeeks = summaries.filter((s) => s.won).length;
-  // A lost week costs the stake. A won week pays the profit at the total odds, when we have them.
-  const net = weeks.reduce((sum, w, i) => {
-    if (!summaries[i].won) return sum - STAKE;
-    return w.totalPrice === null ? sum : sum + STAKE * (toDecimal(w.totalPrice) - 1);
-  }, 0);
+  const badges = streakBadges(results);
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 px-4 py-6">
@@ -81,45 +78,9 @@ export default async function Home() {
       </header>
 
       <div className="grid grid-cols-2 gap-3">
-        <section className="card">
-          <p className="label">Parlays (W-L)</p>
-          <p className="text-3xl font-bold tracking-tight">
-            {wonWeeks}-{summaries.length - wonWeeks}
-          </p>
-          <p className={`text-sm font-semibold ${net < 0 ? "text-red-400" : "text-emerald-400"}`}>
-            {net < 0 ? "Down" : "Up"} {money.format(Math.abs(net))}
-          </p>
-        </section>
-        <section className="card">
-          <p className="label">Legs (W-L-P)</p>
-          <p className="text-3xl font-bold tracking-tight">{formatRecord(legRecord)}</p>
-          <p className="text-sm text-zinc-400">{decided === 0 ? "-" : percent(legRecord.wins / decided)} hit rate</p>
-        </section>
+        <PickerCard title="🦈 Sharks" tone="!text-emerald-400" rows={best} photos={photos} badges={badges} />
+        <PickerCard title="💩 Shitters" tone="!text-red-400" rows={worst} photos={photos} badges={badges} />
       </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <PickerCard title="Best picker" tone="!text-emerald-400" rows={best} photos={photos} />
-        <PickerCard title="Worst picker" tone="!text-red-400" rows={worst} photos={photos} />
-      </div>
-
-      {bestWeek && worstWeek && (
-        <div className="grid grid-cols-2 gap-3">
-          <section className="card">
-            <p className="label">Best week</p>
-            <p className="font-bold">Week {bestWeek.weekNumber}</p>
-            <p className="text-xs text-zinc-400">
-              {bestWeek.hits} of {bestWeek.total} legs hit
-            </p>
-          </section>
-          <section className="card">
-            <p className="label">Worst week</p>
-            <p className="font-bold">Week {worstWeek.weekNumber}</p>
-            <p className="text-xs text-zinc-400">
-              {worstWeek.hits} of {worstWeek.total} legs hit
-            </p>
-          </section>
-        </div>
-      )}
 
       <section className="card">
         <h2 className="label">Leaderboard</h2>
@@ -128,7 +89,12 @@ export default async function Home() {
             <li key={r.slug}>
               <Link href={`/${r.slug}`} className="flex items-center gap-3 border-b border-zinc-800 py-2 last:border-b-0 hover:opacity-80">
                 <span className="w-5 text-center text-sm font-semibold text-zinc-500">{i + 1}</span>
-                <Avatar name={r.name} photoUrl={photos.get(r.slug) ?? null} className="size-9 text-sm" />
+                <Avatar
+                  name={r.name}
+                  photoUrl={photos.get(r.slug) ?? null}
+                  className="size-9 text-sm"
+                  badge={badgeOf(badges, r.slug)}
+                />
                 <span className="min-w-0 flex-1 truncate font-semibold">{r.name}</span>
                 <span className="text-sm text-zinc-400">{formatRecord(r.record)}</span>
                 <span className="w-10 text-right text-sm font-bold">{percent(r.rate)}</span>

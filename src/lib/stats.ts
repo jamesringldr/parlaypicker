@@ -2,7 +2,6 @@ import { PLAYERS, hitRate, sameOwner, tally, type Tally } from "./players";
 
 export interface WeekResults {
   weekNumber: number;
-  totalPrice: number | null;
   legs: { owner: string; result: string }[];
 }
 
@@ -35,24 +34,29 @@ export function extremes(rows: Standing[]): { best: Standing[]; worst: Standing[
   return { best: rated.filter((r) => r.rate === top), worst: rated.filter((r) => r.rate === bottom) };
 }
 
-export interface WeekSummary {
-  weekNumber: number;
-  hits: number;
-  total: number;
-  won: boolean;
+export type Badge = "fire" | "ice";
+
+export const BADGE_EMOJI: Record<Badge, string> = { fire: "🔥", ice: "🧊" };
+
+const STREAK = 3;
+
+// Fire for a current run of 3 hits, ice for 3 misses. Pushes neither extend nor break a run.
+export function streakBadge(results: string[]): Badge | null {
+  const decided = results.filter((r) => r === "hit" || r === "miss");
+  const last = decided.slice(-STREAK);
+  if (last.length < STREAK) return null;
+  if (last.every((r) => r === "hit")) return "fire";
+  if (last.every((r) => r === "miss")) return "ice";
+  return null;
 }
 
-export function summarizeWeeks(weeks: WeekResults[]): WeekSummary[] {
-  return weeks.map((w) => {
-    const record = tally(w.legs.map((l) => l.result));
-    return { weekNumber: w.weekNumber, hits: record.wins, total: w.legs.length, won: record.losses === 0 };
-  });
-}
-
-// Weeks with the highest and lowest share of legs hit. A tie goes to the later week.
-export function bestAndWorstWeek(summaries: WeekSummary[]): { best: WeekSummary | null; worst: WeekSummary | null } {
-  if (summaries.length === 0) return { best: null, worst: null };
-  const share = (w: WeekSummary) => (w.total === 0 ? 0 : w.hits / w.total);
-  const sorted = [...summaries].sort((a, b) => share(b) - share(a) || b.weekNumber - a.weekNumber);
-  return { best: sorted[0], worst: sorted[sorted.length - 1] };
+// Each player's badge, from their legs in week order.
+export function badges(weeks: WeekResults[]): Map<string, Badge> {
+  const ordered = [...weeks].sort((a, b) => a.weekNumber - b.weekNumber).flatMap((w) => w.legs);
+  const out = new Map<string, Badge>();
+  for (const p of PLAYERS) {
+    const badge = streakBadge(ordered.filter((l) => sameOwner(l.owner, p.name)).map((l) => l.result));
+    if (badge) out.set(p.slug, badge);
+  }
+  return out;
 }
