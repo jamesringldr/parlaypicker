@@ -104,7 +104,7 @@ function Marker({ state }: { state: LegState }) {
 function Logos({ urls, live }: { urls: string[]; live: boolean }) {
   return (
     <div
-      className={`flex size-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 ring-2 ${
+      className={`flex size-11 shrink-0 items-center justify-center rounded-full bg-zinc-300 ring-2 ${
         live ? "ring-emerald-500" : "ring-zinc-800"
       }`}
     >
@@ -236,7 +236,10 @@ export default async function LiveParlay(props: PageProps<"/live-board">) {
           )}
         </div>
         <p className="text-sm text-zinc-500">
-          {hits} of {legs.length} legs hit{combined !== null && <> · pays {formatPrice(combined)}</>} · updates every
+          <Link href={`${LIVE_PATH}/past-weeks`} className="text-blue-400 hover:underline">
+            Past weeks
+          </Link>{" "}
+          · {hits} of {legs.length} legs hit{combined !== null && <> · pays {formatPrice(combined)}</>} · updates every
           30s
         </p>
       </header>

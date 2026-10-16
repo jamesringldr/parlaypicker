@@ -3,7 +3,7 @@
 import { randomUUID } from "node:crypto";
 import { notFound, redirect } from "next/navigation";
 import { fail } from "@/lib/action-helpers";
-import { getLegs, isAdminKey, LIVE_PATH, saveLegs } from "@/lib/live/board";
+import { archiveBoard, getLegs, isAdminKey, LIVE_PATH, saveLegs } from "@/lib/live/board";
 import { PROP_STATS, type Leg, type LegKind, type Manual, type PropStat } from "@/lib/live/grade";
 import { oddsProvider } from "@/lib/odds";
 
@@ -111,4 +111,12 @@ export async function markLeg(formData: FormData) {
   const manual: Manual | undefined = result === "hit" || result === "miss" || result === "push" ? result : undefined;
   await saveLegs((await getLegs()).map((l) => (l.id === id ? { ...l, manual } : l)));
   redirect(back);
+}
+
+// Moves the finished week to Past weeks and empties the board for the next one.
+export async function archiveWeek(formData: FormData) {
+  const back = authorize(formData);
+  const problem = await archiveBoard();
+  if (problem) fail(back, problem);
+  redirect(`${LIVE_PATH}/past-weeks`);
 }

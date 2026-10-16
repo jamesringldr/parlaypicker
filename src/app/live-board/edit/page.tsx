@@ -6,7 +6,7 @@ import { getLegs, isAdminKey, LIVE_PATH } from "@/lib/live/board";
 import { PROP_STATS } from "@/lib/live/grade";
 import { oddsProvider } from "@/lib/odds";
 import { formatPrice } from "@/lib/rules";
-import { addLeg, markLeg, removeLeg } from "./actions";
+import { addLeg, archiveWeek, markLeg, removeLeg } from "./actions";
 
 export const metadata = { title: "Edit Live Parlay", robots: { index: false, follow: false } };
 
@@ -73,6 +73,17 @@ export default async function EditLive(props: PageProps<"/live-board/edit">) {
           </li>
         ))}
       </ul>
+
+      {legs.length > 0 && (
+        <form action={archiveWeek} className="card flex flex-col gap-2">
+          {hidden}
+          <h2 className="font-semibold">Archive this week</h2>
+          <p className="text-sm text-zinc-400">
+            Saves every leg with its result to Past weeks and clears the board. Every leg must be settled.
+          </p>
+          <button className="btn-ghost self-start">Archive week</button>
+        </form>
+      )}
 
       <form action={addLeg} className="card flex flex-col gap-3">
         {hidden}

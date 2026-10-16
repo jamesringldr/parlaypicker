@@ -3,6 +3,8 @@ import { NFL_CODES } from "./teams";
 
 // College teams are entered by hand, so only add the ones that show up.
 const NCAA: Record<string, number> = {
+  Indiana: 84,
+  "Kansas State": 2306,
   Pittsburgh: 221,
 };
 
