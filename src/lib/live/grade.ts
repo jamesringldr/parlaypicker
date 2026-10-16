@@ -18,7 +18,7 @@ export const PROP_STATS: Record<PropStat, { label: string; unit: string; yards: 
   rush_yds: { label: "Rushing yds", unit: "rush yds", yards: true },
   rec_yds: { label: "Receiving yds", unit: "rec yds", yards: true },
   pass_yds: { label: "Passing yds", unit: "pass yds", yards: true },
-  anytime_td: { label: "Any time touchdown scorer", unit: "TD", yards: false },
+  anytime_td: { label: "Any time TD scorer", unit: "TD", yards: false },
 };
 
 export interface Leg {
@@ -44,6 +44,8 @@ export interface Leg {
   prop?: PropSpec;
   // Hand-set result. Always wins over the auto grade.
   manual?: Manual;
+  // Hand-set game state, for a game with no score feed (college today). Used in place of a feed score.
+  sim?: GameScore;
 }
 
 export interface GameScore {
@@ -75,6 +77,16 @@ export function normName(name: string): string {
     .replace(/\s+/g, " ")
     .replace(/ (jr|sr|ii|iii|iv|v)$/, "")
     .trim();
+}
+
+// The score to grade and show for a leg: a hand-set one, else the feed's.
+export function legScore(leg: Leg, scores: Map<string, GameScore>): GameScore | undefined {
+  return leg.sim ?? (leg.eventId ? scores.get(leg.eventId) : undefined);
+}
+
+// Bet types read "Any time TD scorer", not "touchdown".
+export function shortMarket(market: string): string {
+  return market.replace(/touchdowns/gi, "TDs").replace(/touchdown/gi, "TD");
 }
 
 // Kicked off and not final. A 0-0 game that just started counts; one that hasn't kicked off doesn't.

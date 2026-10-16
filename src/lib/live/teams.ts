@@ -46,7 +46,10 @@ const abbreviation = (team: string) => NFL_CODES[team]?.toUpperCase() ?? nicknam
 // "NE 7 - 7 BUF" (away first, like the @ line).
 export function matchupLine(leg: Leg, score: GameScore | undefined): string {
   const { homeTeam, awayTeam } = leg;
-  if (leg.sport !== "nfl" || !homeTeam || !awayTeam) return leg.matchup ?? "";
+  if (!homeTeam || !awayTeam) return leg.matchup ?? "";
+  const scored = !!score && score.homeScore !== null && score.awayScore !== null;
+  // No team codes outside the NFL, so a scored game there uses the full names.
+  if (leg.sport !== "nfl") return scored ? `${awayTeam} ${score!.awayScore} - ${score!.homeScore} ${homeTeam}` : (leg.matchup ?? "");
   if (score && score.homeScore !== null && score.awayScore !== null) {
     return `${abbreviation(awayTeam)} ${score.awayScore} - ${score.homeScore} ${abbreviation(homeTeam)}`;
   }

@@ -5,7 +5,7 @@ import { AutoRefresh } from "@/components/auto-refresh";
 import { Avatar } from "@/components/avatar";
 import { KickoffTime } from "@/components/kickoff-time";
 import { getBoard, LIVE_PATH } from "@/lib/live/board";
-import { gameIsLive, gradeLeg, parlayState, type Grade, type Leg, type LegKind, type LegState } from "@/lib/live/grade";
+import { gameIsLive, gradeLeg, legScore, parlayState, shortMarket, type Grade, type Leg, type LegKind, type LegState } from "@/lib/live/grade";
 import { legLogos } from "@/lib/live/logos";
 import { getRoster } from "@/lib/live/players";
 import { getScores } from "@/lib/live/scores";
@@ -126,6 +126,13 @@ function Logos({ urls, live }: { urls: string[]; live: boolean }) {
   );
 }
 
+// The line is all caps, but "TDs" keeps its lowercase s.
+function Market({ text }: { text: string }) {
+  return shortMarket(text)
+    .split(/(TDs)/)
+    .map((part, i) => (part === "TDs" ? <span key={i} className="normal-case">{part}</span> : part));
+}
+
 function LegRow({
   leg,
   grade,
@@ -161,13 +168,12 @@ function LegRow({
           <div className="min-w-0 flex-1">
             <p className={`truncate text-lg font-bold leading-tight ${accent}`}>{leg.label}</p>
             <p className="truncate text-xs font-medium uppercase tracking-widest text-zinc-400">
-              {leg.market ?? KIND_LABEL[leg.kind]}
+              <Market text={leg.market ?? KIND_LABEL[leg.kind]} />
               {leg.price !== undefined && <span className="ml-1.5 font-bold text-zinc-200">{formatPrice(leg.price)}</span>}
             </p>
           </div>
-          <div className="flex shrink-0 items-center gap-1.5 self-start pt-0.5">
-            <Avatar name={leg.owner} photoUrl={photoUrl} className="size-6 text-xs" />
-            <span className="text-sm font-semibold text-zinc-200">{leg.owner}</span>
+          <div className="shrink-0 self-start" title={leg.owner} aria-label={`Picked by ${leg.owner}`}>
+            <Avatar name={leg.owner} photoUrl={photoUrl} className="size-8 text-sm" />
           </div>
         </div>
         {/* Before kickoff the start time sits under the matchup. Once it's on, the clock takes the right side. */}
@@ -214,7 +220,7 @@ export default async function LiveParlay(props: PageProps<"/live-board">) {
   const [{ scores, boxes, backup, error, at: renderedAt }, roster] = await Promise.all([getScores(legs), getRoster()]);
   const photoOf = (owner: string) => roster.find((p) => sameOwner(p.name, owner))?.photoUrl ?? null;
   const graded = legs.map((leg) => {
-    const score = leg.eventId ? scores.get(leg.eventId) : undefined;
+    const score = legScore(leg, scores);
     return {
       leg,
       grade: gradeLeg(leg, score, leg.eventId ? boxes.get(leg.eventId) : undefined),
