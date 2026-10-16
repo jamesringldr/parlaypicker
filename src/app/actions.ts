@@ -61,8 +61,8 @@ export async function submitPick(formData: FormData) {
   });
   if (error) fail(back, dbErrorMessage(error));
 
-  revalidatePath("/");
-  redirect("/");
+  revalidatePath("/legacy");
+  redirect("/legacy");
 }
 
 export async function removePick(formData: FormData) {
@@ -78,8 +78,8 @@ export async function removePick(formData: FormData) {
     .eq("picker_id", viewer.id);
   if (error) fail("/", dbErrorMessage(error));
 
-  revalidatePath("/");
-  redirect("/");
+  revalidatePath("/legacy");
+  redirect("/legacy");
 }
 
 export async function signOut() {

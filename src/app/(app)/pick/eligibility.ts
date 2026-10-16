@@ -12,7 +12,7 @@ export async function requirePicker() {
     viewer.id === current.parlay.better_id ||
     current.picks.some((p) => p.picker_id === viewer.id)
   ) {
-    redirect("/");
+    redirect("/legacy");
   }
   return { viewer, ...current };
 }

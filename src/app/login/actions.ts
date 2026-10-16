@@ -1,55 +1,51 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { fail, safeNext } from "@/lib/action-helpers";
 import { isPin, verifyPin } from "@/lib/pin";
-import { playerBySlug } from "@/lib/players";
 import { SESSION_COOKIE, sessionCookieOptions, signSession } from "@/lib/session";
 import { createAdminClient } from "@/lib/supabase/server";
 
 const MAX_TRIES = 5;
 const LOCK_MINUTES = 15;
 
+// Every PIN is different, so the PIN alone says who's signing in.
 export async function signInWithPin(formData: FormData) {
-  const slug = String(formData.get("slug") ?? "");
   const pin = String(formData.get("pin") ?? "").trim();
   const next = safeNext(String(formData.get("next") ?? ""));
-  const player = playerBySlug(slug);
-  const back = `/login?as=${slug}${next ? `&next=${encodeURIComponent(next)}` : ""}`;
-  if (!player) fail("/login", "Choose your name.");
+  const back = next ? `/login?next=${encodeURIComponent(next)}` : "/login";
   if (!isPin(pin)) fail(back, "Enter your 4-digit PIN.");
 
+  // Wrong tries are counted per visitor, since there's no name to count them against.
+  const ip = (await headers()).get("x-forwarded-for")?.split(",")[0].trim() || "unknown";
   const db = createAdminClient();
-  const { data, error } = await db
-    .from("player_profiles")
-    .select("pin_hash, failed_attempts, locked_until")
-    .eq("slug", player.slug)
+  const { data: attempts } = await db
+    .from("login_attempts")
+    .select("failed_attempts, locked_until")
+    .eq("ip", ip)
     .maybeSingle();
-  if (error) fail(back, "Something went wrong. Try again.");
-  if (!data?.pin_hash) fail(back, `${player.name} doesn't have a PIN yet.`);
-
-  const lockedFor = data.locked_until ? new Date(data.locked_until).getTime() - Date.now() : 0;
+  const lockedFor = attempts?.locked_until ? new Date(attempts.locked_until).getTime() - Date.now() : 0;
   if (lockedFor > 0) fail(back, `Too many wrong tries. Try again in ${Math.ceil(lockedFor / 60000)} min.`);
 
-  if (!verifyPin(pin, data.pin_hash)) {
-    const tries = data.failed_attempts + 1;
+  const { data: players, error } = await db.from("player_profiles").select("slug, pin_hash").not("pin_hash", "is", null);
+  if (error) fail(back, "Something went wrong. Try again.");
+  const match = players.find((p) => verifyPin(pin, p.pin_hash as string));
+
+  if (!match) {
+    const tries = (attempts?.failed_attempts ?? 0) + 1;
     const locked = tries >= MAX_TRIES;
-    await db
-      .from("player_profiles")
-      .update({
-        failed_attempts: locked ? 0 : tries,
-        locked_until: locked ? new Date(Date.now() + LOCK_MINUTES * 60000).toISOString() : null,
-      })
-      .eq("slug", player.slug);
+    await db.from("login_attempts").upsert({
+      ip,
+      failed_attempts: locked ? 0 : tries,
+      locked_until: locked ? new Date(Date.now() + LOCK_MINUTES * 60000).toISOString() : null,
+    });
     fail(back, locked ? `Too many wrong tries. Locked for ${LOCK_MINUTES} min.` : "That PIN is wrong.");
   }
 
-  if (data.failed_attempts > 0 || data.locked_until) {
-    await db.from("player_profiles").update({ failed_attempts: 0, locked_until: null }).eq("slug", player.slug);
-  }
-  (await cookies()).set(SESSION_COOKIE, signSession(player.slug), sessionCookieOptions);
-  redirect(next ?? `/${player.slug}`);
+  if (attempts) await db.from("login_attempts").delete().eq("ip", ip);
+  (await cookies()).set(SESSION_COOKIE, signSession(match.slug as string), sessionCookieOptions);
+  redirect(next ?? `/${match.slug}`);
 }
 
 export async function signOutPlayer() {
