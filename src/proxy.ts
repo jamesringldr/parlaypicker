@@ -28,16 +28,18 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const player = readSession(request.cookies.get(SESSION_COOKIE)?.value);
 
-  // The stats home, Games, Bet Slip and player profiles (/rodgers) need a PIN sign-in. Photos stay open.
-  if (pathname === "/" || pathname.startsWith("/games") || pathname.startsWith("/bet-slip") || playerBySlug(pathname.slice(1))) {
+  // The stats home, Games, Bet Slip, the live board and player profiles (/rodgers) need a PIN sign-in.
+  // The live board's edit page is the exception: it has its own key. Photos stay open.
+  const liveBoard = pathname.startsWith("/live-board") && !pathname.startsWith("/live-board/edit");
+  if (pathname === "/" || pathname.startsWith("/games") || pathname.startsWith("/bet-slip") || liveBoard || playerBySlug(pathname.slice(1))) {
     if (!player) {
       const login = new URL("/login", request.url);
-      login.searchParams.set("next", pathname);
+      // Keep the query too, so signing in lands on the same tab (/live-board?tab=settled).
+      login.searchParams.set("next", pathname + request.nextUrl.search);
       return NextResponse.redirect(login);
     }
   } else {
-    // /live-board is the unlisted shared tracker. Its edit page checks a key.
-    const open = ["/login", "/live-board", "/players/", "/api/cron/"].some((p) => pathname.startsWith(p));
+    const open = ["/login", "/live-board/edit", "/players/", "/api/cron/"].some((p) => pathname.startsWith(p));
     if (!data?.claims && !open) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
