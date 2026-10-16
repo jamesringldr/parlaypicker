@@ -104,7 +104,7 @@ function Marker({ state }: { state: LegState }) {
 function Logos({ urls, live }: { urls: string[]; live: boolean }) {
   return (
     <div
-      className={`flex size-11 shrink-0 items-center justify-center rounded-full bg-zinc-900 ring-2 ${
+      className={`flex size-11 shrink-0 items-center justify-center rounded-full bg-zinc-300 ring-2 ${
         live ? "ring-emerald-500" : "ring-zinc-800"
       }`}
     >
