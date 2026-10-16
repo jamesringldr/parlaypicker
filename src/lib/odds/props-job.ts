@@ -2,7 +2,7 @@ import "server-only";
 import { OddsApiError, orderPool, withFallback, type PooledKey } from "./key-pool";
 import { FANDUEL, isOddsApiEvent, toEventOdds, type OddsApiEventOdds } from "./map";
 import { PROP_MARKETS, toGameProps, type GameProps, type PropsSnapshot } from "./props";
-import { savePropsSnapshot } from "./props-store";
+import { matchesFor, savePropsSnapshot } from "./props-store";
 import { oddsRequest } from "./the-odds-api";
 import { SPORTS } from "./types";
 
@@ -79,6 +79,7 @@ export async function pullNflProps(apiKeys: string[], now = Date.now()): Promise
     fetchedAt: new Date(now).toISOString(),
     games,
     creditsRemaining: total(remainingNow()),
+    ...(await matchesFor(games)),
   };
   await savePropsSnapshot(snapshot);
   return { saved: true, games: games.length, creditsUsed, creditsRemaining: remainingNow(), errors };
