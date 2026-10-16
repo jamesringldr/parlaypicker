@@ -7,9 +7,10 @@ import { Avatar } from "@/components/avatar";
 import type { SlipStatus } from "@/lib/betslip";
 import { getBetSlip, type Scorer } from "@/lib/live/betslip";
 import { formatRecord } from "@/lib/players";
+import { LIVE_PATH } from "@/lib/live/board";
 import { formatPrice, toWin } from "@/lib/rules";
 
-export const metadata: Metadata = { title: "Bet Slip | Low-T Parlay", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: "Bet Slips | Low-T Parlay", robots: { index: false, follow: false } };
 
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
@@ -40,7 +41,7 @@ function WeekNav({ weeks, selected, current }: { weeks: number[]; selected: numb
         </span>
       )}
       <div className="text-center">
-        <h1 className="text-xl font-bold tracking-tight">Week {selected}</h1>
+        <h2 className="text-xl font-bold tracking-tight">Week {selected}</h2>
         <p className="text-xs uppercase tracking-widest text-zinc-400">{selected === current ? "This week" : "Final"}</p>
       </div>
       {next ? (
@@ -85,6 +86,13 @@ export default async function BetSlipPage(props: PageProps<"/bet-slip">) {
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 px-4 py-6">
       {!slip.closed && <AutoRefresh />}
+      <header className="flex items-center justify-between gap-3">
+        <h1 className="text-xl font-bold tracking-tight">Bet Slips</h1>
+        <Link href={LIVE_PATH} className="btn shrink-0">
+          Live Board
+        </Link>
+      </header>
+
       <WeekNav weeks={slip.weeks} selected={slip.selected} current={slip.current} />
 
       <section className="card flex flex-col gap-4">
