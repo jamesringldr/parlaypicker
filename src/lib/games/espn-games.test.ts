@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { parseGames, parseWeekNumber } from "./espn-games";
 
-const side = (homeAway: string, abbr: string, record: string, score = "0") => ({
+const side = (homeAway: string, abbr: string, record: string, score = "0", rank?: number) => ({
   homeAway,
   score,
+  curatedRank: rank === undefined ? undefined : { current: rank },
   records: [{ type: "total", summary: record }],
   team: { abbreviation: abbr, displayName: abbr, logoDark: `https://x/${abbr}.png` },
 });
@@ -62,6 +63,25 @@ describe("parseGames", () => {
   it("skips a malformed event instead of throwing", () => {
     expect(parseGames({ events: [{ id: "x" }, null, event("pre")] })).toHaveLength(1);
     expect(parseGames(null)).toEqual([]);
+  });
+});
+
+describe("rankings", () => {
+  const ranked = (home: number | undefined, away: number | undefined) => ({
+    id: "1",
+    date: "2026-10-17T16:00Z",
+    status: { type: { state: "pre" } },
+    competitions: [{ competitors: [side("home", "IU", "6-0", "0", home), side("away", "OSU", "6-0", "0", away)] }],
+  });
+
+  it("keeps a top-25 rank and drops ESPN's 99 for unranked", () => {
+    const [g] = parseGames({ events: [ranked(5, 99)] });
+    expect(g.home.rank).toBe(5);
+    expect(g.away.rank).toBeNull();
+  });
+
+  it("has no rank when ESPN sends none", () => {
+    expect(parseGames({ events: [ranked(undefined, undefined)] })[0].home.rank).toBeNull();
   });
 });
 

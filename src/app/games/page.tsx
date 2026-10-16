@@ -1,10 +1,17 @@
 import type { Metadata } from "next";
-import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarDays, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { connection } from "next/server";
 import { AutoRefresh } from "@/components/auto-refresh";
 import type { GameCard, Price, Side } from "@/lib/games/espn-games";
-import { getNflWeek, REGULAR_SEASON_WEEKS, type NflWeek } from "@/lib/games/nfl";
+import {
+  CONFERENCES,
+  getCollegeSlate,
+  getNflSlate,
+  isCollegeFilter,
+  type CollegeFilter,
+  type Slate,
+} from "@/lib/games/scoreboard";
 import { formatPrice } from "@/lib/rules";
 
 export const metadata: Metadata = { title: "Games | Low-T Parlay", robots: { index: false, follow: false } };
@@ -64,7 +71,10 @@ function TeamRow({ side, game, which }: { side: Side; game: GameCard; which: "aw
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={side.logo} alt="" className="size-10 shrink-0 object-contain" loading="lazy" />
         <div className="min-w-0">
-          <p className="truncate text-lg font-bold leading-tight">{side.abbr}</p>
+          <p className="truncate text-lg font-bold leading-tight">
+            {side.rank !== null && <span className="mr-1 text-xs font-semibold text-zinc-400">{side.rank}</span>}
+            {side.abbr}
+          </p>
           {side.record && <p className="text-xs leading-tight text-zinc-400">{side.record}</p>}
         </div>
       </div>
@@ -121,58 +131,41 @@ const TABS = [
 ];
 
 // Only Game Lines is live. The prop tabs need FanDuel's player markets, which come from the paid Odds API.
-const MARKETS = ["Game Lines", "SGPs", "TDs", "Passing", "Rushing", "Receiving"];
+const MARKETS = ["Game Lines", "TDs", "Passing", "Rushing", "Receiving"];
 
-function WeekNav({ week }: { week: number }) {
-  const arrow = "flex h-12 w-12 shrink-0 items-center justify-center text-zinc-300";
+function WeekTitle({ week }: { week: number }) {
   return (
-    <div className="flex items-center rounded-full border border-zinc-700">
-      {week > 1 ? (
-        <Link href={`/games?week=${week - 1}`} aria-label={`Week ${week - 1}`} className={`${arrow} hover:text-white`}>
-          <ChevronLeft className="size-5" aria-hidden />
-        </Link>
-      ) : (
-        <span className={`${arrow} opacity-30`} aria-hidden>
-          <ChevronLeft className="size-5" />
-        </span>
-      )}
-      <p className="flex flex-1 items-center justify-center gap-2 text-lg font-semibold">
-        <CalendarDays className="size-5" aria-hidden />
-        Week {week}
-      </p>
-      {week < REGULAR_SEASON_WEEKS ? (
-        <Link href={`/games?week=${week + 1}`} aria-label={`Week ${week + 1}`} className={`${arrow} hover:text-white`}>
-          <ChevronRight className="size-5" aria-hidden />
-        </Link>
-      ) : (
-        <span className={`${arrow} opacity-30`} aria-hidden>
-          <ChevronRight className="size-5" />
-        </span>
-      )}
-    </div>
+    <h1 className="flex items-center gap-2 text-xl font-bold tracking-tight">
+      <CalendarDays className="size-5 text-zinc-400" aria-hidden />
+      Week {week}
+    </h1>
   );
 }
 
+const FILTERS: { key: CollegeFilter; label: string }[] = [
+  { key: "top25", label: "Top 25" },
+  ...CONFERENCES.map((c) => ({ key: c.key, label: c.label })),
+];
+
 export default async function Games(props: PageProps<"/games">) {
   await connection();
-  const { sport, week } = await props.searchParams;
+  const { sport, conf } = await props.searchParams;
   const ncaa = sport === "ncaa";
-  const requested = typeof week === "string" && /^\d+$/.test(week) ? Number(week) : null;
+  const filter: CollegeFilter = isCollegeFilter(conf) ? conf : "top25";
 
-  let data: NflWeek | null = null;
+  let data: Slate | null = null;
   let error: string | null = null;
-  if (!ncaa) {
-    try {
-      data = await getNflWeek(requested !== null && requested >= 1 && requested <= REGULAR_SEASON_WEEKS ? requested : null);
-    } catch (e) {
-      error = e instanceof Error ? e.message : "Couldn't load the games.";
-    }
+  try {
+    data = ncaa ? await getCollegeSlate(filter) : await getNflSlate();
+  } catch (e) {
+    error = e instanceof Error ? e.message : "Couldn't load the games.";
   }
 
   const games = data?.games ?? [];
   const live = games.filter((g) => g.state === "in");
   const upcoming = games.filter((g) => g.state === "pre");
   const final = games.filter((g) => g.state === "post");
+  const markets = ncaa ? MARKETS.slice(0, 1) : MARKETS;
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 px-4 py-6">
@@ -194,35 +187,52 @@ export default async function Games(props: PageProps<"/games">) {
         ))}
       </nav>
 
-      {ncaa ? (
-        <p className="card text-sm text-zinc-400">College lines are coming next.</p>
-      ) : (
-        <>
-          <div className="-mx-4 flex gap-6 overflow-x-auto border-b border-zinc-800 px-4">
-            {MARKETS.map((m, i) => (
-              <span
-                key={m}
-                title={i === 0 ? undefined : "Coming soon"}
-                className={`shrink-0 whitespace-nowrap border-b-4 pb-3 text-lg font-semibold ${
-                  i === 0 ? "border-emerald-500 text-zinc-50" : "border-transparent text-zinc-600"
-                }`}
-              >
-                {m}
-              </span>
-            ))}
-          </div>
+      <div className="-mx-4 flex gap-6 overflow-x-auto border-b border-zinc-800 px-4">
+        {markets.map((m, i) => (
+          <span
+            key={m}
+            title={i === 0 ? undefined : "Coming soon"}
+            className={`shrink-0 whitespace-nowrap border-b-4 pb-3 text-lg font-semibold ${
+              i === 0 ? "border-emerald-500 text-zinc-50" : "border-transparent text-zinc-600"
+            }`}
+          >
+            {m}
+          </span>
+        ))}
+      </div>
 
-          {data && <WeekNav week={data.week} />}
-          {error && <p className="card text-sm text-amber-300">Games are unavailable right now ({error}).</p>}
-          {data && games.length === 0 && <p className="card text-sm text-zinc-400">No games this week.</p>}
+      {ncaa && (
+        <nav className="-mx-4 flex gap-2 overflow-x-auto px-4" aria-label="Conference">
+          {FILTERS.map((f) => (
+            <Link
+              key={f.key}
+              href={f.key === "top25" ? "/games?sport=ncaa" : `/games?sport=ncaa&conf=${f.key}`}
+              replace
+              scroll={false}
+              aria-current={filter === f.key ? "page" : undefined}
+              className={`shrink-0 whitespace-nowrap rounded-full border px-4 py-1.5 text-sm font-semibold ${
+                filter === f.key
+                  ? "border-zinc-300 bg-zinc-800 text-zinc-50"
+                  : "border-zinc-700 text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              {f.label}
+            </Link>
+          ))}
+        </nav>
+      )}
 
-          <Section title="Live" games={live} open />
-          <Section title="Upcoming" games={upcoming} open />
-          <Section title="Final" games={final} open={live.length === 0 && upcoming.length === 0} />
-          {games.some((g) => g.lines) && (
-            <p className="text-center text-xs text-zinc-500">Lines from DraftKings via ESPN. FanDuel&apos;s can differ.</p>
-          )}
-        </>
+      {data && <WeekTitle week={data.week} />}
+      {error && <p className="card text-sm text-amber-300">Games are unavailable right now ({error}).</p>}
+      {data && games.length === 0 && (
+        <p className="card text-sm text-zinc-400">{ncaa && filter === "top25" ? "No ranked teams play this week." : "No games this week."}</p>
+      )}
+
+      <Section title="Live" games={live} open />
+      <Section title="Upcoming" games={upcoming} open />
+      <Section title="Final" games={final} open={live.length === 0 && upcoming.length === 0} />
+      {games.some((g) => g.lines) && (
+        <p className="text-center text-xs text-zinc-500">Lines from DraftKings via ESPN. FanDuel&apos;s can differ.</p>
       )}
     </main>
   );

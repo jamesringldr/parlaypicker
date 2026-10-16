@@ -10,6 +10,8 @@ export interface Side {
   abbr: string;
   name: string;
   record: string | null;
+  // AP ranking when in the top 25. College only.
+  rank: number | null;
   logo: string;
   score: number | null;
 }
@@ -79,10 +81,12 @@ function parseSide(c: Record<string, unknown>): Side {
   const team = rec(c.team);
   const overall = arr(c.records).map(rec).find((r) => r.type === "total");
   const score = parseNumber(c.score);
+  const rank = parseNumber(rec(c.curatedRank).current);
   return {
     abbr: String(team.abbreviation ?? ""),
     name: String(team.displayName ?? ""),
     record: typeof overall?.summary === "string" ? overall.summary : null,
+    rank: rank !== null && rank >= 1 && rank <= 25 ? rank : null,
     logo: String(team.logoDark ?? team.logo ?? ""),
     score,
   };
