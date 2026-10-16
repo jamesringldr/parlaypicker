@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
 import { Avatar } from "@/components/avatar";
-import { getPastWeeks } from "@/lib/live/board";
+import { getPastWeeks, LIVE_PATH } from "@/lib/live/board";
 import { getRoster } from "@/lib/live/players";
 import { formatRecord } from "@/lib/players";
 import { badges as streakBadges, BADGE_EMOJI, extremes, standings, type Badge, type Standing } from "@/lib/stats";
@@ -68,13 +68,18 @@ export default async function Home() {
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 px-4 py-6">
-      <header>
-        <h1 className="text-xl font-bold tracking-tight">
-          Low-T <span className="text-emerald-400">Parlay</span>
-        </h1>
-        <p className="text-sm text-zinc-500">
-          {weeks.length} week{weeks.length === 1 ? "" : "s"} played
-        </p>
+      <header className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight">
+            Low-T <span className="text-emerald-400">Parlay</span>
+          </h1>
+          <p className="text-sm text-zinc-500">
+            {weeks.length} week{weeks.length === 1 ? "" : "s"} played
+          </p>
+        </div>
+        <Link href={LIVE_PATH} className="btn shrink-0">
+          Live Board
+        </Link>
       </header>
 
       <div className="grid grid-cols-2 gap-3">
