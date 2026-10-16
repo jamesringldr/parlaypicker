@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { isPullTime } from "@/lib/odds/props";
 import { pullNflProps } from "@/lib/odds/props-job";
+import { refreshSnapshotPhotos } from "@/lib/odds/props-store";
 
 function authorized(request: Request): boolean {
   const secret = process.env.CRON_SECRET;
@@ -14,7 +15,18 @@ function authorized(request: Request): boolean {
 export async function GET(request: Request) {
   if (!authorized(request)) return new Response("Unauthorized", { status: 401 });
 
-  const force = new URL(request.url).searchParams.get("force") === "1";
+  const params = new URL(request.url).searchParams;
+
+  // `?photos=1` re-matches player photos on the stored props. It costs no credits.
+  if (params.get("photos") === "1") {
+    try {
+      return Response.json((await refreshSnapshotPhotos()) ?? { error: "No props have been pulled yet." });
+    } catch (error) {
+      return Response.json({ error: error instanceof Error ? error.message : "Photo refresh failed." }, { status: 500 });
+    }
+  }
+
+  const force = params.get("force") === "1";
   if (!force && !isPullTime(Date.now())) return Response.json({ skipped: "Not noon Central on a Tue, Wed or Thu." });
 
   // Either key can pay for the pull. The one with more credits goes first.

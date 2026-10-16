@@ -1,6 +1,17 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/server";
-import { PROP_TABS, type GameProps, type PlayerProp, type PropsSnapshot, type PropTab } from "./props";
+import { buildRosterIndex, matchPlayers, type PlayerMatches } from "@/lib/games/headshots";
+import { fetchRosters } from "@/lib/games/headshots-fetch";
+import type { GameProps, PropsSnapshot } from "./props";
+
+// Best effort: if ESPN is down the props still save, just without photos or sides.
+export async function matchesFor(games: GameProps[]): Promise<PlayerMatches> {
+  try {
+    return matchPlayers(buildRosterIndex(await fetchRosters()), games);
+  } catch {
+    return { photos: {}, sides: {} };
+  }
+}
 
 const KEY = "nfl-props";
 
@@ -8,8 +19,8 @@ export async function getPropsSnapshot(): Promise<PropsSnapshot | null> {
   const { data, error } = await createAdminClient().from("odds_snapshots").select("fetched_at, data").eq("key", KEY).maybeSingle();
   if (error) throw new Error(`Couldn't load the props: ${error.message}`);
   if (!data) return null;
-  const stored = data.data as Pick<PropsSnapshot, "games" | "creditsRemaining">;
-  return { fetchedAt: data.fetched_at, games: stored.games, creditsRemaining: stored.creditsRemaining };
+  const stored = data.data as Pick<PropsSnapshot, "games" | "creditsRemaining"> & Partial<Pick<PropsSnapshot, "photos" | "sides">>;
+  return { fetchedAt: data.fetched_at, games: stored.games, creditsRemaining: stored.creditsRemaining, photos: stored.photos ?? {}, sides: stored.sides ?? {} };
 }
 
 export async function savePropsSnapshot(snapshot: PropsSnapshot) {
@@ -18,30 +29,34 @@ export async function savePropsSnapshot(snapshot: PropsSnapshot) {
     .upsert({
       key: KEY,
       fetched_at: snapshot.fetchedAt,
-      data: { games: snapshot.games, creditsRemaining: snapshot.creditsRemaining },
+      data: { games: snapshot.games, creditsRemaining: snapshot.creditsRemaining, photos: snapshot.photos, sides: snapshot.sides },
     });
   if (error) throw new Error(`Couldn't save the props: ${error.message}`);
 }
 
-export interface TabProps {
+export interface UpcomingProps {
   fetchedAt: string;
-  // Games that haven't kicked off and have something to show on this tab, in kickoff order.
-  games: { game: GameProps; rows: PlayerProp[] }[];
+  photos: Record<string, string>;
+  sides: Record<string, "away" | "home">;
+  // Games that haven't kicked off, in kickoff order.
+  games: GameProps[];
 }
 
-export async function getTabProps(tab: PropTab, now = Date.now()): Promise<TabProps | null> {
+export async function getUpcomingProps(now = Date.now()): Promise<UpcomingProps | null> {
   const snapshot = await getPropsSnapshot();
   if (!snapshot) return null;
-  const { market, yards } = PROP_TABS[tab];
   const games = snapshot.games
     .filter((g) => new Date(g.commenceTime).getTime() > now)
-    .map((game) => {
-      const rows = [...(game.markets[market] ?? [])];
-      // Yardage: biggest lines first. TDs: likeliest scorer (shortest price) first.
-      rows.sort(yards ? (a, b) => (b.point ?? 0) - (a.point ?? 0) : (a, b) => (a.yes ?? 0) - (b.yes ?? 0));
-      return { game, rows };
-    })
-    .filter((g) => g.rows.length > 0)
-    .sort((a, b) => a.game.commenceTime.localeCompare(b.game.commenceTime));
-  return { fetchedAt: snapshot.fetchedAt, games };
+    .sort((a, b) => a.commenceTime.localeCompare(b.commenceTime));
+  return { fetchedAt: snapshot.fetchedAt, photos: snapshot.photos, sides: snapshot.sides, games };
+}
+
+// Re-matches photos on the stored games. Free: no Odds API credits, just ESPN rosters.
+export async function refreshSnapshotPhotos(): Promise<{ players: number; matched: number } | null> {
+  const snapshot = await getPropsSnapshot();
+  if (!snapshot) return null;
+  const { photos, sides } = await matchesFor(snapshot.games);
+  await savePropsSnapshot({ ...snapshot, photos, sides });
+  const players = new Set(snapshot.games.flatMap((g) => Object.values(g.markets).flatMap((rows) => rows.map((r) => r.player))));
+  return { players: players.size, matched: Object.keys(photos).length };
 }

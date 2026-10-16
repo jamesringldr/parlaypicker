@@ -16,7 +16,7 @@ export function Avatar({
     <span className="relative inline-flex shrink-0">
       {photoUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={photoUrl} alt="" className={`${className} rounded-full object-cover ring-2 ring-zinc-700`} />
+        <img src={photoUrl} alt="" className={`${className} rounded-full object-cover object-top ring-2 ring-zinc-700`} />
       ) : (
         <span
           className={`${className} flex items-center justify-center rounded-full bg-zinc-800 font-bold text-zinc-300 ring-2 ring-zinc-700`}

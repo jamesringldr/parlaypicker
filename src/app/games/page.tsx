@@ -12,10 +12,10 @@ import {
   type CollegeFilter,
   type Slate,
 } from "@/lib/games/scoreboard";
-import { isPropTab, PROP_TABS, type PropTab } from "@/lib/odds/props";
-import { getTabProps, type TabProps } from "@/lib/odds/props-store";
+import { findGameProps, isPropTab } from "@/lib/odds/props";
+import { getUpcomingProps, type UpcomingProps } from "@/lib/odds/props-store";
 import { formatPrice } from "@/lib/rules";
-import { PropsView } from "./props-view";
+import { GamesView, PlayersView, type TeamInfo } from "./props-view";
 import { kickoffLabel, Line, signed } from "./shared";
 
 export const metadata: Metadata = { title: "Games | Low-T Parlay", robots: { index: false, follow: false } };
@@ -73,19 +73,29 @@ function TeamRow({ side, game, which }: { side: Side; game: GameCard; which: "aw
   );
 }
 
-function Card({ game }: { game: GameCard }) {
+function Card({ game, propsId }: { game: GameCard; propsId?: string }) {
   return (
     <article className="flex flex-col gap-3 rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
       <TeamRow side={game.away} game={game} which="away" />
       <TeamRow side={game.home} game={game} which="home" />
-      <p className="text-sm text-zinc-400">
-        {game.state === "pre" ? kickoffLabel(game.kickoff) : game.state === "in" ? <span className="font-semibold text-emerald-400">{game.detail}</span> : game.detail}
-      </p>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-zinc-400">
+          {game.state === "pre" ? kickoffLabel(game.kickoff) : game.state === "in" ? <span className="font-semibold text-emerald-400">{game.detail}</span> : game.detail}
+        </p>
+        {propsId && (
+          <Link
+            href={`/games?tab=props&view=games&game=${propsId}`}
+            className="rounded-full border border-zinc-600 px-3.5 py-1 text-sm font-semibold text-zinc-100 hover:bg-zinc-800"
+          >
+            Props
+          </Link>
+        )}
+      </div>
     </article>
   );
 }
 
-function Section({ title, games, open }: { title: string; games: GameCard[]; open: boolean }) {
+function Section({ title, games, open, propsIds }: { title: string; games: GameCard[]; open: boolean; propsIds: Map<string, string> }) {
   if (games.length === 0) return null;
   return (
     <details open={open} className="group">
@@ -95,7 +105,7 @@ function Section({ title, games, open }: { title: string; games: GameCard[]; ope
       </summary>
       <div className="flex flex-col gap-3">
         {games.map((g) => (
-          <Card key={g.id} game={g} />
+          <Card key={g.id} game={g} propsId={g.state === "pre" ? propsIds.get(g.id) : undefined} />
         ))}
       </div>
     </details>
@@ -114,35 +124,56 @@ const FILTERS: { key: CollegeFilter; label: string }[] = [
 
 export default async function Games(props: PageProps<"/games">) {
   await connection();
-  const { sport, conf, tab } = await props.searchParams;
+  const { sport, conf, tab, view, player, prop, cat, game: gameParam } = await props.searchParams;
   const ncaa = sport === "ncaa";
-  const propTab: PropTab | null = !ncaa && isPropTab(tab) ? tab : null;
+  const onProps = !ncaa && tab === "props";
+  const propsView = view === "games" ? "games" : "players";
   const filter: CollegeFilter = isCollegeFilter(conf) ? conf : "top25";
 
   let data: Slate | null = null;
-  let propsData: TabProps | null = null;
+  let propsData: UpcomingProps | null = null;
   let error: string | null = null;
   try {
-    if (propTab) propsData = await getTabProps(propTab);
+    if (onProps) propsData = await getUpcomingProps();
     else data = ncaa ? await getCollegeSlate(filter) : await getNflSlate();
   } catch (e) {
     error = e instanceof Error ? e.message : "Couldn't load the games.";
+  }
+
+  // The Games list shows each team's logo and record, which only ESPN's scoreboard has.
+  const teams: TeamInfo = new Map();
+  if (onProps && propsView === "games") {
+    try {
+      for (const g of (await getNflSlate()).games) {
+        for (const side of [g.away, g.home]) teams.set(side.name, { logo: side.logo, record: side.record, abbr: side.abbr });
+      }
+    } catch {
+      // Cards show names and times without them.
+    }
+  }
+
+  // ESPN's game ids and the odds provider's differ, so each card finds its props by team names.
+  const propsIds = new Map<string, string>();
+  if (!ncaa && !onProps) {
+    try {
+      const snapshot = await getUpcomingProps();
+      for (const g of data?.games ?? []) {
+        const match = snapshot && findGameProps(snapshot.games, g.away.name, g.home.name);
+        if (match) propsIds.set(g.id, match.eventId);
+      }
+    } catch {
+      // No Props buttons, and the lines still show.
+    }
   }
 
   const games = data?.games ?? [];
   const live = games.filter((g) => g.state === "in");
   const upcoming = games.filter((g) => g.state === "pre");
   const final = games.filter((g) => g.state === "post");
-  // Game Lines for both leagues. Player props are NFL only.
+  // Game Lines for both leagues. Props are NFL only.
   const markets = [
-    { label: "Game Lines", href: "/games", active: propTab === null },
-    ...(ncaa
-      ? []
-      : (Object.keys(PROP_TABS) as PropTab[]).map((k) => ({
-          label: PROP_TABS[k].label,
-          href: `/games?tab=${k}`,
-          active: propTab === k,
-        }))),
+    { label: "Game Lines", href: "/games", active: !onProps },
+    ...(ncaa ? [] : [{ label: "Props", href: "/games?tab=props", active: onProps }]),
   ];
 
   return (
@@ -210,15 +241,43 @@ export default async function Games(props: PageProps<"/games">) {
         </nav>
       )}
 
-      {propTab && !error && <PropsView tab={propTab} props={propsData} />}
+      {onProps && !error && (
+        <>
+          <nav className="flex gap-1 rounded-xl bg-zinc-900 p-1" aria-label="Props view">
+            {(["players", "games"] as const).map((v) => (
+              <Link
+                key={v}
+                href={`/games?tab=props&view=${v}`}
+                replace
+                aria-current={propsView === v ? "page" : undefined}
+                className={`flex-1 rounded-lg py-2 text-center text-sm font-semibold ${
+                  propsView === v ? "bg-zinc-700 text-zinc-50" : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                {v === "players" ? "Players" : "Games"}
+              </Link>
+            ))}
+          </nav>
+          {propsView === "players" ? (
+            <PlayersView props={propsData} player={typeof player === "string" ? player : null} prop={isPropTab(prop) ? prop : "tds"} />
+          ) : (
+            <GamesView
+              props={propsData}
+              gameId={typeof gameParam === "string" ? gameParam : null}
+              category={isPropTab(cat) ? cat : null}
+              teams={teams}
+            />
+          )}
+        </>
+      )}
       {error && <p className="card text-sm text-amber-300">Games are unavailable right now ({error}).</p>}
       {data && games.length === 0 && (
         <p className="card text-sm text-zinc-400">{ncaa && filter === "top25" ? "No ranked teams play this week." : "No games this week."}</p>
       )}
 
-      <Section title="Live" games={live} open />
-      <Section title="Upcoming" games={upcoming} open />
-      <Section title="Final" games={final} open={live.length === 0 && upcoming.length === 0} />
+      <Section title="Live" games={live} open propsIds={propsIds} />
+      <Section title="Upcoming" games={upcoming} open propsIds={propsIds} />
+      <Section title="Final" games={final} open={live.length === 0 && upcoming.length === 0} propsIds={propsIds} />
       {games.some((g) => g.lines) && (
         <p className="text-center text-xs text-zinc-500">Lines from DraftKings via ESPN. FanDuel&apos;s can differ.</p>
       )}
