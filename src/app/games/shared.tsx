@@ -16,7 +16,7 @@ export function kickoffLabel(iso: string): string {
 export const signed = (n: number) => (n > 0 ? `+${n}` : `${n}`);
 
 // One tappable-looking line: the number on top, the price under it.
-export function Line({ top, bottom, className = "w-[4.1rem] shrink-0" }: { top: string; bottom: string; className?: string }) {
+export function Line({ top, bottom, className = "w-[3.6rem] shrink-0 sm:w-[4.1rem]" }: { top: string; bottom: string; className?: string }) {
   return (
     <div className={`${className} rounded-lg bg-zinc-800 py-1.5 text-center`}>
       <p className="text-sm font-bold leading-tight">{top}</p>
@@ -26,11 +26,10 @@ export function Line({ top, bottom, className = "w-[4.1rem] shrink-0" }: { top: 
 }
 
 
-// "OCT 18" and "8:30 AM", in Central time, for the stacked date block on a game card.
-export function kickoffParts(iso: string): { date: string; time: string } {
+// "SUN" and "8:30 AM", in Central time, for the day and time on a game card.
+export function kickoffParts(iso: string): { day: string; time: string } {
   const parts = new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
+    weekday: "short",
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
@@ -38,7 +37,7 @@ export function kickoffParts(iso: string): { date: string; time: string } {
   }).formatToParts(new Date(iso));
   const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
   return {
-    date: `${get("month")} ${get("day")}`.toUpperCase(),
+    day: get("weekday").toUpperCase(),
     time: `${get("hour")}:${get("minute")} ${get("dayPeriod").toUpperCase()}`,
   };
 }
@@ -47,6 +46,19 @@ export function kickoffParts(iso: string): { date: string; time: string } {
 export function kickoffLong(iso: string): string {
   const parts = new Intl.DateTimeFormat("en-US", {
     weekday: "long",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: "America/Chicago",
+  }).formatToParts(new Date(iso));
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${get("weekday")} ${get("hour")}:${get("minute")}${get("dayPeriod").toLowerCase()}`;
+}
+
+// "Sun 8:30am", in Central time, for the kickoff line on a game card.
+export function kickoffShort(iso: string): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
     hour: "numeric",
     minute: "2-digit",
     hour12: true,

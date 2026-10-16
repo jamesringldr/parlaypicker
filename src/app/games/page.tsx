@@ -15,8 +15,9 @@ import {
 import { findGameProps, isPropTab } from "@/lib/odds/props";
 import { getUpcomingProps, type UpcomingProps } from "@/lib/odds/props-store";
 import { formatPrice } from "@/lib/rules";
-import { GamesView, PlayersView, type TeamInfo } from "./props-view";
-import { kickoffLabel, Line, signed } from "./shared";
+import { GamesView, PlayersView, type TeamInfo, type VenueInfo } from "./props-view";
+import { ForecastIcon } from "./forecast-icon";
+import { kickoffShort, Line, signed } from "./shared";
 
 export const metadata: Metadata = { title: "Games | Low-T Parlay", robots: { index: false, follow: false } };
 
@@ -43,12 +44,12 @@ function TeamRow({ side, game, which }: { side: Side; game: GameCard; which: "aw
           : "";
 
   return (
-    <div className="flex items-center gap-2">
-      <div className="flex min-w-0 flex-1 items-center gap-3">
+    <div className="flex items-center gap-1.5 sm:gap-2">
+      <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={side.logo} alt="" className="size-10 shrink-0 object-contain" loading="lazy" />
+        <img src={side.logo} alt="" className="size-8 shrink-0 object-contain sm:size-10" loading="lazy" />
         <div className="min-w-0">
-          <p className="truncate text-lg font-bold leading-tight">
+          <p className="truncate text-base font-bold leading-tight sm:text-lg">
             {side.rank !== null && <span className="mr-1 text-xs font-semibold text-zinc-400">{side.rank}</span>}
             {side.abbr}
           </p>
@@ -57,9 +58,10 @@ function TeamRow({ side, game, which }: { side: Side; game: GameCard; which: "aw
       </div>
       {state === "pre" ? (
         <>
-          <p className="w-10 shrink-0 text-center text-sm text-zinc-400">{openText}</p>
+          {/* The opening line is the first thing to go when the row is too tight. */}
+          <p className="hidden w-8 shrink-0 text-center text-sm text-zinc-400 min-[400px]:block sm:w-10">{openText}</p>
           {lines && (
-            <div className="flex gap-1.5">
+            <div className="flex gap-1 sm:gap-1.5">
               {spreadLine(lines.spread[which])}
               {totalLine(which === "away" ? lines.total.over : lines.total.under, which === "away" ? "o" : "u")}
               {mlLine(lines.moneyline[which])}
@@ -79,9 +81,17 @@ function Card({ game, propsId }: { game: GameCard; propsId?: string }) {
       <TeamRow side={game.away} game={game} which="away" />
       <TeamRow side={game.home} game={game} which="home" />
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-zinc-400">
-          {game.state === "pre" ? kickoffLabel(game.kickoff) : game.state === "in" ? <span className="font-semibold text-emerald-400">{game.detail}</span> : game.detail}
-        </p>
+        {game.state === "pre" ? (
+          <p className="flex min-w-0 items-center gap-1.5 text-sm text-zinc-400">
+            <span className="shrink-0">{kickoffShort(game.kickoff)}</span>
+            {game.venue.city && <span className="truncate">· {game.venue.city}</span>}
+            <ForecastIcon venue={game.venue} forecast={game.forecast} />
+          </p>
+        ) : (
+          <p className="text-sm text-zinc-400">
+            {game.state === "in" ? <span className="font-semibold text-emerald-400">{game.detail}</span> : game.detail}
+          </p>
+        )}
         {propsId && (
           <Link
             href={`/games?tab=props&view=games&game=${propsId}`}
@@ -142,10 +152,12 @@ export default async function Games(props: PageProps<"/games">) {
 
   // The Games list shows each team's logo and record, which only ESPN's scoreboard has.
   const teams: TeamInfo = new Map();
+  const venues: VenueInfo = new Map();
   if (onProps && propsView === "games") {
     try {
       for (const g of (await getNflSlate()).games) {
         for (const side of [g.away, g.home]) teams.set(side.name, { logo: side.logo, record: side.record, abbr: side.abbr });
+        venues.set(`${g.away.name}|${g.home.name}`, { venue: g.venue, forecast: g.forecast });
       }
     } catch {
       // Cards show names and times without them.
@@ -266,6 +278,7 @@ export default async function Games(props: PageProps<"/games">) {
               gameId={typeof gameParam === "string" ? gameParam : null}
               category={isPropTab(cat) ? cat : null}
               teams={teams}
+              venues={venues}
             />
           )}
         </>
