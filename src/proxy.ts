@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { playerBySlug } from "@/lib/players";
+import { readSession, SESSION_COOKIE, sessionCookieOptions, signSession } from "@/lib/session";
 
 // Refreshes the Supabase session cookie and sends signed-out users to /login.
 export async function proxy(request: NextRequest) {
@@ -24,14 +25,26 @@ export async function proxy(request: NextRequest) {
 
   const { data } = await supabase.auth.getClaims();
 
-  // /live-board is the unlisted shared tracker. Its edit page checks a key.
-  // Player profiles (/rodgers) and their photos are open too until sign-in covers them.
-  const open =
-    ["/login", "/live-board", "/players/"].some((p) => request.nextUrl.pathname.startsWith(p)) ||
-    !!playerBySlug(request.nextUrl.pathname.slice(1));
-  if (!data?.claims && !open) {
-    return NextResponse.redirect(new URL("/login", request.url));
+  const { pathname } = request.nextUrl;
+  const player = readSession(request.cookies.get(SESSION_COOKIE)?.value);
+
+  // Player profiles (/rodgers) need a PIN sign-in. Their photos are open so the sign-in screen can show them.
+  if (playerBySlug(pathname.slice(1))) {
+    if (!player) {
+      const login = new URL("/login", request.url);
+      login.searchParams.set("next", pathname);
+      return NextResponse.redirect(login);
+    }
+  } else {
+    // /live-board is the unlisted shared tracker. Its edit page checks a key.
+    const open = ["/login", "/live-board", "/players/"].some((p) => pathname.startsWith(p));
+    if (!data?.claims && !open) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
   }
+
+  // Keep signed-in players signed in: every visit pushes the expiry out again.
+  if (player) response.cookies.set(SESSION_COOKIE, signSession(player), sessionCookieOptions);
 
   return response;
 }

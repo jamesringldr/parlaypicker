@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
+import { signOutPlayer } from "@/app/login/actions";
 import { LIVE_PATH, type ArchivedLeg } from "@/lib/live/board";
-import { getPlayerProfile } from "@/lib/live/players";
+import { getPlayerProfile, getRoster } from "@/lib/live/players";
 import { formatRecord, hitRate, playerBySlug } from "@/lib/players";
 import { formatPrice } from "@/lib/rules";
 
@@ -23,12 +24,14 @@ export async function generateMetadata(props: PageProps<"/[player]">): Promise<M
   return { title: player ? `${player.name} | Low-T Parlay` : "Low-T Parlay", robots: { index: false, follow: false } };
 }
 
-function Avatar({ name, photoUrl }: { name: string; photoUrl: string | null }) {
+function Avatar({ name, photoUrl, className = "size-20 text-3xl" }: { name: string; photoUrl: string | null; className?: string }) {
   return photoUrl ? (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={photoUrl} alt="" className="size-20 shrink-0 rounded-full object-cover ring-2 ring-zinc-700" />
+    <img src={photoUrl} alt="" className={`${className} shrink-0 rounded-full object-cover ring-2 ring-zinc-700`} />
   ) : (
-    <div className="flex size-20 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-3xl font-bold text-zinc-300 ring-2 ring-zinc-700">
+    <div
+      className={`${className} flex shrink-0 items-center justify-center rounded-full bg-zinc-800 font-bold text-zinc-300 ring-2 ring-zinc-700`}
+    >
       {name[0]}
     </div>
   );
@@ -53,8 +56,9 @@ function LegLine({ leg }: { leg: ArchivedLeg }) {
 export default async function PlayerPage(props: PageProps<"/[player]">) {
   await connection();
   const { player: slug } = await props.params;
-  const profile = await getPlayerProfile(slug);
+  const [profile, roster] = await Promise.all([getPlayerProfile(slug), getRoster()]);
   if (!profile) notFound();
+  const others = roster.filter((p) => p.slug !== slug.toLowerCase());
 
   const { record } = profile;
   const rate = hitRate(record);
@@ -130,6 +134,25 @@ export default async function PlayerPage(props: PageProps<"/[player]">) {
           </ul>
         </section>
       ))}
+
+      <nav aria-label="Other players" className="mt-2">
+        <h2 className="label">Everyone</h2>
+        {/* Swipes sideways and snaps to each photo. */}
+        <ul className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2">
+          {others.map((p) => (
+            <li key={p.slug} className="shrink-0 snap-start">
+              <Link href={`/${p.slug}`} className="flex w-20 flex-col items-center gap-1.5 hover:opacity-80">
+                <Avatar name={p.name} photoUrl={p.photoUrl} className="size-16 text-2xl" />
+                <span className="w-full truncate text-center text-xs font-semibold text-zinc-300">{p.name}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </nav>
+
+      <form action={signOutPlayer} className="text-center">
+        <button className="text-xs text-zinc-500 underline hover:text-zinc-300">Sign out</button>
+      </form>
     </main>
   );
 }
