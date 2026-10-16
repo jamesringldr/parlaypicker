@@ -24,6 +24,19 @@ export interface Lines {
   open: { total: number | null; favorite: "away" | "home" | null; spread: number | null };
 }
 
+export interface Venue {
+  city: string | null;
+  // A dome or closed roof. The forecast is for outside, so it doesn't matter there.
+  indoor: boolean;
+}
+
+export interface Forecast {
+  // ESPN's condition id, which is AccuWeather's icon number (1 sunny, 18 rain, 32 windy...).
+  code: number;
+  label: string; // "Mostly cloudy"
+  temperature: number | null;
+}
+
 export interface GameCard {
   id: string;
   kickoff: string; // ISO
@@ -33,6 +46,8 @@ export interface GameCard {
   away: Side;
   home: Side;
   lines: Lines | null;
+  venue: Venue;
+  forecast: Forecast | null;
 }
 
 const rec = (v: unknown): Record<string, unknown> => (typeof v === "object" && v !== null ? (v as Record<string, unknown>) : {});
@@ -92,6 +107,13 @@ function parseSide(c: Record<string, unknown>): Side {
   };
 }
 
+function parseForecast(weather: unknown): Forecast | null {
+  const w = rec(weather);
+  const code = parseNumber(w.conditionId);
+  if (code === null || typeof w.displayValue !== "string") return null;
+  return { code, label: w.displayValue, temperature: parseNumber(w.temperature) };
+}
+
 export function parseGames(json: unknown): GameCard[] {
   return arr(rec(json).events).flatMap((event): GameCard[] => {
     const e = rec(event);
@@ -118,6 +140,12 @@ export function parseGames(json: unknown): GameCard[] {
         away: parseSide(away),
         home: parseSide(home),
         lines: parseLines(arr(comp.odds)[0]),
+        venue: {
+          city: typeof rec(rec(comp.venue).address).city === "string" ? String(rec(rec(comp.venue).address).city) : null,
+          indoor: rec(comp.venue).indoor === true,
+        },
+        // ESPN puts the forecast on the event, not the competition.
+        forecast: parseForecast(e.weather),
       },
     ];
   });

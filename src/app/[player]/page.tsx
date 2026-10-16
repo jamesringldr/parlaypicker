@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Avatar } from "@/components/avatar";
-import { signOutPlayer } from "@/app/login/actions";
 import { LIVE_PATH, type ArchivedLeg } from "@/lib/live/board";
 import { getBadges, getPlayerProfile, getRoster } from "@/lib/live/players";
 import { formatRecord, hitRate, playerBySlug } from "@/lib/players";
 import { formatPrice } from "@/lib/rules";
+import { readSession, SESSION_COOKIE } from "@/lib/session";
 import { BADGE_EMOJI } from "@/lib/stats";
 
 const RESULT = {
@@ -52,31 +53,28 @@ export default async function PlayerPage(props: PageProps<"/[player]">) {
 
   const { record } = profile;
   const rate = hitRate(record);
+  // "My Legs" on your own page. On someone else's it's theirs.
+  const isOwn = readSession((await cookies()).get(SESSION_COOKIE)?.value) === slug.toLowerCase();
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 px-4 py-6">
-      <Link href={LIVE_PATH} className="text-sm text-blue-400 hover:underline">
-        Live board
-      </Link>
-
-      <header className="flex items-center gap-4">
-        <Avatar name={profile.name} photoUrl={profile.photoUrl} badge={emoji(slug.toLowerCase())} badgeClass="text-2xl" />
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight">{profile.name}</h1>
-          {profile.fantasyName && <p className="truncate text-sm text-zinc-400">{profile.fantasyName}</p>}
-        </div>
+    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 px-4 pb-28 pt-6">
+      <header className="flex items-center justify-between gap-3">
+        <h1 className="text-xl font-bold tracking-tight">{isOwn ? "My Legs" : `${profile.name}'s Legs`}</h1>
+        <Link href={LIVE_PATH} className="btn shrink-0">
+          Live Board
+        </Link>
       </header>
 
-      <section className="card flex items-baseline justify-between gap-3">
-        <div>
-          <p className="label">Record (W-L-P)</p>
-          <p className="text-3xl font-bold tracking-tight">{formatRecord(record)}</p>
+      <section className="flex items-center gap-3">
+        <Avatar name={profile.name} photoUrl={profile.photoUrl} className="size-16 text-2xl" badge={emoji(slug.toLowerCase())} badgeClass="text-xl" />
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate text-xl font-bold tracking-tight">{profile.name}</h2>
+          {profile.fantasyName && <p className="truncate text-sm text-zinc-400">{profile.fantasyName}</p>}
         </div>
-        {rate !== null && (
-          <p className="text-right text-sm text-zinc-400">
-            <span className="text-xl font-bold text-zinc-100">{Math.round(rate * 100)}%</span> hit rate
-          </p>
-        )}
+        <div className="shrink-0 text-right">
+          <p className="text-2xl font-bold leading-tight tracking-tight">{formatRecord(record)}</p>
+          {rate !== null && <p className="text-xs text-zinc-400">{Math.round(rate * 100)}% hit rate</p>}
+        </div>
       </section>
 
       {profile.current.legs.length > 0 && (
@@ -125,24 +123,26 @@ export default async function PlayerPage(props: PageProps<"/[player]">) {
         </section>
       ))}
 
-      <nav aria-label="Other players" className="mt-2">
-        <h2 className="label">Everyone</h2>
-        {/* Swipes sideways and snaps to each photo. */}
-        <ul className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2">
-          {others.map((p) => (
-            <li key={p.slug} className="shrink-0 snap-start">
-              <Link href={`/${p.slug}`} className="flex w-20 flex-col items-center gap-1.5 hover:opacity-80">
-                <Avatar name={p.name} photoUrl={p.photoUrl} className="size-16 text-2xl" badge={emoji(p.slug)} badgeClass="text-lg" />
-                <span className="w-full truncate text-center text-xs font-semibold text-zinc-300">{p.name}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+      {/* Always pinned to the top of the app bar. The top padding on the row leaves room for a streak badge. */}
+      <nav
+        aria-label="Pick history"
+        className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-10 border-t border-zinc-800 bg-zinc-950/95 backdrop-blur"
+      >
+        <div className="mx-auto max-w-2xl px-4 pb-1 pt-2">
+          <h2 className="label !mb-0">Pick History</h2>
+          {/* Swipes sideways and snaps to each photo. */}
+          <ul className="-mx-4 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-1 pt-3">
+            {others.map((p) => (
+              <li key={p.slug} className="shrink-0 snap-start">
+                <Link href={`/${p.slug}`} className="flex w-20 flex-col items-center gap-1.5 hover:opacity-80">
+                  <Avatar name={p.name} photoUrl={p.photoUrl} className="size-14 text-xl" badge={emoji(p.slug)} badgeClass="text-lg" />
+                  <span className="w-full truncate text-center text-xs font-semibold text-zinc-300">{p.name}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
       </nav>
-
-      <form action={signOutPlayer} className="text-center">
-        <button className="text-xs text-zinc-500 underline hover:text-zinc-300">Sign out</button>
-      </form>
     </main>
   );
 }

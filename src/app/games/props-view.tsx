@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { nickname } from "@/lib/live/teams";
 import {
@@ -14,6 +15,8 @@ import type { UpcomingProps } from "@/lib/odds/props-store";
 import { formatPrice } from "@/lib/rules";
 import { PlayerSearch } from "./player-search";
 import { PropSelect } from "./prop-select";
+import type { Forecast, Venue } from "@/lib/games/espn-games";
+import { ForecastIcon } from "./forecast-icon";
 import { kickoffLabel, kickoffLong, kickoffParts, Line } from "./shared";
 
 const TABS = Object.keys(PROP_TABS) as PropTab[];
@@ -237,44 +240,64 @@ function GameBlock({
 export type TeamInfo = Map<string, { logo: string; record: string | null; abbr: string }>;
 
 function TeamLine({ name, info }: { name: string; info?: { logo: string; record: string | null } }) {
+  const nick = nickname(name);
+  // Long names step down so they fit between the logo and the date block.
+  const size = nick.length >= 10 ? "text-[13px]" : nick.length >= 8 ? "text-[15px]" : "text-lg";
   return (
     <div className="flex items-center gap-2">
       {info?.logo ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={info.logo} alt="" className="size-9 shrink-0 object-contain" loading="lazy" />
+        <img src={info.logo} alt="" className="size-8 shrink-0 object-contain sm:size-9" loading="lazy" />
       ) : (
-        <span className="size-9 shrink-0" aria-hidden />
+        <span className="size-8 shrink-0 sm:size-9" aria-hidden />
       )}
-      <span
-        className={`min-w-0 flex-1 truncate font-black uppercase italic tracking-tight ${nickname(name).length > 9 ? "text-base" : "text-lg"}`}
-      >
-        {nickname(name)}
-      </span>
-      <span className="w-9 shrink-0 text-right text-sm font-semibold text-zinc-400">{info?.record ?? ""}</span>
+      <div className="min-w-0">
+        <p className={`truncate font-black uppercase italic leading-tight tracking-tight ${size}`}>{nick}</p>
+        {info?.record && <p className="text-xs font-semibold leading-tight text-zinc-400">{info.record}</p>}
+      </div>
     </div>
   );
 }
 
-// The game card: teams stacked on the left, then a divider and the date over the time.
-function GameHeader({ game, teams }: { game: GameProps; teams: TeamInfo }) {
-  const { date, time } = kickoffParts(game.commenceTime);
+// A card in the Games list: the teams with their records, then the day, time and where it's played with the
+// forecast, then a "View Props" at the far right. The middle and right zones size to their text.
+function GameHeader({ game, teams, venues }: { game: GameProps; teams: TeamInfo; venues: VenueInfo }) {
+  const { day, time } = kickoffParts(game.commenceTime);
+  const where = venues.get(`${game.awayTeam}|${game.homeTeam}`);
   return (
     <div className="flex items-stretch">
-      <div className="flex min-w-0 flex-1 flex-col justify-center gap-3 py-4 pl-4 pr-3">
+      <div className="flex min-w-0 flex-1 flex-col justify-center gap-2.5 py-3.5 pl-3.5 pr-2">
         <TeamLine name={game.awayTeam} info={teams.get(game.awayTeam)} />
         <TeamLine name={game.homeTeam} info={teams.get(game.homeTeam)} />
       </div>
       <div className="my-3 w-px shrink-0 bg-zinc-700" aria-hidden />
-      <div className="flex w-[5.25rem] shrink-0 flex-col items-center justify-center px-1 text-center font-bold leading-snug">
-        <span>{date}</span>
-        <span>{time}</span>
+      <div className="flex w-[6.25rem] shrink-0 flex-col items-center min-[370px]:w-[7.25rem] justify-center gap-0.5 px-1.5 text-center text-sm font-bold leading-snug">
+        <span>{day}</span>
+        <span className="whitespace-nowrap">{time}</span>
+        {where && (where.venue.city || where.venue.indoor || where.forecast) && (
+          <span className="flex max-w-full items-center justify-center gap-1 text-[11px] font-normal text-zinc-400">
+            {where.venue.city && <span className="truncate">{where.venue.city}</span>}
+            <ForecastIcon venue={where.venue} forecast={where.forecast} className="size-3.5 shrink-0" />
+          </span>
+        )}
       </div>
+      <span className="flex shrink-0 items-center gap-0.5 pl-1 pr-2 text-xs font-semibold leading-tight text-emerald-400">
+        <span className="text-center">
+          View
+          <br />
+          Props
+        </span>
+        <ChevronRight className="size-4 shrink-0" aria-hidden />
+      </span>
     </div>
   );
 }
 
-// The header on a game's own page: each team's logo over its abbreviation, with the kickoff between.
-function DetailHeader({ game, teams }: { game: GameProps; teams: TeamInfo }) {
+// Where a game is played and the forecast for it, from ESPN's scoreboard, keyed "away name|home name".
+export type VenueInfo = Map<string, { venue: Venue; forecast: Forecast | null }>;
+
+function DetailHeader({ game, teams, venues }: { game: GameProps; teams: TeamInfo; venues: VenueInfo }) {
+  const where = venues.get(`${game.awayTeam}|${game.homeTeam}`);
   const side = (name: string) => {
     const info = teams.get(name);
     return (
@@ -292,7 +315,15 @@ function DetailHeader({ game, teams }: { game: GameProps; teams: TeamInfo }) {
   return (
     <div className="flex items-start justify-between gap-2 px-4 py-4">
       {side(game.awayTeam)}
-      <p className="mt-4 text-center text-zinc-400">{kickoffLong(game.commenceTime)}</p>
+      <div className="mt-4 flex min-w-0 flex-col items-center gap-1 text-center text-zinc-400">
+        <p>{kickoffLong(game.commenceTime)}</p>
+        {where && (where.venue.city || where.venue.indoor || where.forecast) && (
+          <p className="flex items-center gap-1.5 text-sm">
+            {where.venue.city && <span className="truncate">{where.venue.city}</span>}
+            <ForecastIcon venue={where.venue} forecast={where.forecast} />
+          </p>
+        )}
+      </div>
       {side(game.homeTeam)}
     </div>
   );
@@ -305,11 +336,13 @@ export function GamesView({
   gameId,
   category,
   teams,
+  venues,
 }: {
   props: UpcomingProps | null;
   gameId: string | null;
   category: PropTab | null;
   teams: TeamInfo;
+  venues: VenueInfo;
 }) {
   if (!props) return <Unavailable />;
   const one = gameId ? props.games.find((g) => g.eventId === gameId) : undefined;
@@ -317,11 +350,12 @@ export function GamesView({
   if (one) {
     return (
       <>
-        <Link href="/games?tab=props&view=games" className="text-sm text-blue-400 hover:underline">
-          All games
+        <Link href="/games?tab=props&view=games" className="inline-flex items-center gap-0.5 self-start text-sm text-blue-400 hover:underline">
+          <ChevronLeft className="size-4" aria-hidden />
+          Games
         </Link>
         <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900">
-          <DetailHeader game={one} teams={teams} />
+          <DetailHeader game={one} teams={teams} venues={venues} />
           <GameBlock game={one} category={category} photos={props.photos} sides={props.sides} />
         </div>
         <Footer fetchedAt={props.fetchedAt} />
@@ -342,7 +376,7 @@ export function GamesView({
               href={`/games?tab=props&view=games&game=${game.eventId}`}
               className="block overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 hover:bg-zinc-800/60"
             >
-              <GameHeader game={game} teams={teams} />
+              <GameHeader game={game} teams={teams} venues={venues} />
             </Link>
           </li>
         ))}

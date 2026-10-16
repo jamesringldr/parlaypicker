@@ -66,6 +66,28 @@ describe("parseGames", () => {
   });
 });
 
+describe("venue and forecast", () => {
+  const withVenue = (extra: Record<string, unknown>, venue: Record<string, unknown>) => ({
+    ...event("pre"),
+    ...extra,
+    competitions: [{ ...event("pre").competitions[0], venue }],
+  });
+
+  it("reads the city, whether the stadium is indoors, and the forecast", () => {
+    const [g] = parseGames({
+      events: [withVenue({ weather: { displayValue: "Sunny", temperature: 59, conditionId: "1" } }, { address: { city: "Atlanta" }, indoor: true })],
+    });
+    expect(g.venue).toEqual({ city: "Atlanta", indoor: true });
+    expect(g.forecast).toEqual({ code: 1, label: "Sunny", temperature: 59 });
+  });
+
+  it("copes with a game that has no venue details or forecast", () => {
+    const [g] = parseGames({ events: [event("pre")] });
+    expect(g.venue).toEqual({ city: null, indoor: false });
+    expect(g.forecast).toBeNull();
+  });
+});
+
 describe("rankings", () => {
   const ranked = (home: number | undefined, away: number | undefined) => ({
     id: "1",
