@@ -1,0 +1,6 @@
+{
+  "crons": [
+    { "path": "/api/cron/nfl-props", "schedule": "0 17 * * 2-4" },
+    { "path": "/api/cron/nfl-props", "schedule": "0 18 * * 2-4" }
+  ]
+}

@@ -1,4 +1,5 @@
 import "server-only";
+import { OddsApiError } from "./key-pool";
 import { FANDUEL, isOddsApiEvent, toEventOdds, toGameEvent, type OddsApiEventOdds } from "./map";
 import { SPORTS, type EventOdds, type GameEvent, type OddsProvider } from "./types";
 
@@ -50,12 +51,25 @@ export function cached<T>(key: string, ttlMs: number, load: () => Promise<T>): P
   return promise;
 }
 
-export async function oddsGet(path: string, params: Record<string, string>): Promise<unknown> {
-  const key = process.env.ODDS_API_KEY;
-  if (!key) throw new Error("ODDS_API_KEY is not set.");
+export interface OddsResponse {
+  data: unknown;
+  // Credits left on the key and what this call cost, from the response headers.
+  remaining: number | null;
+  cost: number | null;
+}
+
+const headerNumber = (value: string | null) => (value !== null && Number.isFinite(Number(value)) ? Number(value) : null);
+
+// `apiKey` defaults to ODDS_API_KEY. The weekly props pull uses its own key.
+export async function oddsRequest(
+  path: string,
+  params: Record<string, string>,
+  apiKey: string | undefined = process.env.ODDS_API_KEY,
+): Promise<OddsResponse> {
+  if (!apiKey) throw new Error("The Odds API key is not set.");
 
   const url = new URL(`${API}${path}`);
-  url.searchParams.set("apiKey", key);
+  url.searchParams.set("apiKey", apiKey);
   for (const [name, value] of Object.entries(params)) url.searchParams.set(name, value);
 
   let response: Response;
@@ -66,9 +80,17 @@ export async function oddsGet(path: string, params: Record<string, string>): Pro
     throw new Error("Odds API could not be reached.");
   }
 
-  if (response.status === 404) return null;
-  if (!response.ok) throw new Error(`Odds API request failed (${response.status}).`);
-  return response.json();
+  const quota = {
+    remaining: headerNumber(response.headers.get("x-requests-remaining")),
+    cost: headerNumber(response.headers.get("x-requests-last")),
+  };
+  if (response.status === 404) return { data: null, ...quota };
+  if (!response.ok) throw new OddsApiError(`Odds API request failed (${response.status}).`, response.status);
+  return { data: await response.json(), ...quota };
+}
+
+export async function oddsGet(path: string, params: Record<string, string>): Promise<unknown> {
+  return (await oddsRequest(path, params)).data;
 }
 
 export const fanduelOddsProvider: OddsProvider = {

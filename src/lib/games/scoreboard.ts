@@ -1,13 +1,12 @@
 import "server-only";
 import { cached } from "@/lib/odds/the-odds-api";
-import { parseGames, parseWeekNumber, type GameCard } from "./espn-games";
+import { parseGames, type GameCard } from "./espn-games";
 
 // ESPN's free scoreboards carry DraftKings lines, so the Games tab costs no Odds API credits.
 const ESPN = "https://site.api.espn.com/apis/site/v2/sports/football";
 const TTL_MS = 60 * 1000;
 
 export interface Slate {
-  week: number;
   games: GameCard[];
 }
 
@@ -40,10 +39,7 @@ function fetchSlate(path: string): Promise<Slate> {
     }
     if (!response.ok) throw new Error(`ESPN request failed (${response.status}).`);
     const json: unknown = await response.json();
-    return {
-      week: parseWeekNumber(json) ?? 1,
-      games: parseGames(json).sort((a, b) => a.kickoff.localeCompare(b.kickoff)),
-    };
+    return { games: parseGames(json).sort((a, b) => a.kickoff.localeCompare(b.kickoff)) };
   });
 }
 

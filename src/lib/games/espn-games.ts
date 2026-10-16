@@ -122,7 +122,3 @@ export function parseGames(json: unknown): GameCard[] {
     ];
   });
 }
-
-export function parseWeekNumber(json: unknown): number | null {
-  return parseNumber(rec(rec(json).week).number);
-}
