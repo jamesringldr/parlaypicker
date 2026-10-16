@@ -1,6 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/server";
-import { playerBySlug, sameOwner, tally, type Tally } from "@/lib/players";
+import { PLAYERS, playerBySlug, sameOwner, tally, type Tally } from "@/lib/players";
 import { getBoard, getPastWeeks, type ArchivedLeg } from "./board";
 import { gradeLeg, type Grade, type Leg } from "./grade";
 import { getScores } from "./scores";
@@ -62,4 +62,18 @@ export async function getPlayerProfile(slug: string): Promise<PlayerProfile | nu
     weeks,
     current: { weekNumber: currentWeek, role: roleOf.get(currentWeek) ?? null, legs },
   };
+}
+
+export interface RosterEntry {
+  name: string;
+  slug: string;
+  photoUrl: string | null;
+}
+
+// Everyone with their photo, in roster order.
+export async function getRoster(): Promise<RosterEntry[]> {
+  const { data, error } = await createAdminClient().from("player_profiles").select("slug, photo_url");
+  if (error) throw new Error(`Couldn't load the roster: ${error.message}`);
+  const photos = new Map(data.map((r) => [r.slug as string, r.photo_url as string | null]));
+  return PLAYERS.map((p) => ({ ...p, photoUrl: photos.get(p.slug) ?? null }));
 }

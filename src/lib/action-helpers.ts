@@ -6,6 +6,11 @@ export function fail(path: string, message: string): never {
   redirect(`${path}${sep}error=${encodeURIComponent(message)}`);
 }
 
+// Only follow paths on this site.
+export function safeNext(next: string): string | null {
+  return next.startsWith("/") && !next.startsWith("//") ? next : null;
+}
+
 // Turns database rule violations into messages people can act on.
 export function dbErrorMessage(error: { code?: string; message: string }): string {
   if (error.code === "P0001") return error.message;
