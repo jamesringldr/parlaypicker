@@ -7,7 +7,7 @@ import { getCurrentParlay, getProfiles, getViewer } from "@/lib/data";
 import { describeOutcome, marketLabel } from "@/lib/odds";
 import { formatPrice, parlayPrice } from "@/lib/rules";
 
-export default async function Home(props: PageProps<"/">) {
+export default async function Home(props: PageProps<"/legacy">) {
   const [viewer, current, profiles] = await Promise.all([getViewer(), getCurrentParlay(), getProfiles()]);
   const nameOf = new Map(profiles.map((p) => [p.id, p.display_name]));
 

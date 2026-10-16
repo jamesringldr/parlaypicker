@@ -8,7 +8,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 pb-12">
       <header className="flex items-center justify-between py-4">
-        <Link href="/" className="text-lg font-bold tracking-tight">
+        <Link href="/legacy" className="text-lg font-bold tracking-tight">
           Parlay<span className="text-emerald-400">Picker</span>
         </Link>
         <nav className="flex items-center gap-2 text-sm">

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
+import { Avatar } from "@/components/avatar";
 import { signOutPlayer } from "@/app/login/actions";
 import { LIVE_PATH, type ArchivedLeg } from "@/lib/live/board";
 import { getPlayerProfile, getRoster } from "@/lib/live/players";
@@ -22,19 +23,6 @@ const ROLE = {
 export async function generateMetadata(props: PageProps<"/[player]">): Promise<Metadata> {
   const player = playerBySlug((await props.params).player);
   return { title: player ? `${player.name} | Low-T Parlay` : "Low-T Parlay", robots: { index: false, follow: false } };
-}
-
-function Avatar({ name, photoUrl, className = "size-20 text-3xl" }: { name: string; photoUrl: string | null; className?: string }) {
-  return photoUrl ? (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={photoUrl} alt="" className={`${className} shrink-0 rounded-full object-cover ring-2 ring-zinc-700`} />
-  ) : (
-    <div
-      className={`${className} flex shrink-0 items-center justify-center rounded-full bg-zinc-800 font-bold text-zinc-300 ring-2 ring-zinc-700`}
-    >
-      {name[0]}
-    </div>
-  );
 }
 
 function LegLine({ leg }: { leg: ArchivedLeg }) {

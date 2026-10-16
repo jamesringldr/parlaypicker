@@ -31,5 +31,5 @@ export async function verifyCode(formData: FormData) {
   const { error } = await supabase.auth.verifyOtp({ email, token, type: "email" });
   if (error) fail(back, "That code didn't work. Check it or request a new one.");
 
-  redirect("/");
+  redirect("/legacy");
 }

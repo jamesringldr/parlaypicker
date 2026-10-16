@@ -28,8 +28,8 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const player = readSession(request.cookies.get(SESSION_COOKIE)?.value);
 
-  // Player profiles (/rodgers) need a PIN sign-in. Their photos are open so the sign-in screen can show them.
-  if (playerBySlug(pathname.slice(1))) {
+  // The stats home, Games and player profiles (/rodgers) need a PIN sign-in. Photos stay open.
+  if (pathname === "/" || pathname.startsWith("/games") || playerBySlug(pathname.slice(1))) {
     if (!player) {
       const login = new URL("/login", request.url);
       login.searchParams.set("next", pathname);

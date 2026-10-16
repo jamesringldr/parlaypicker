@@ -20,7 +20,7 @@ export default async function PickGame(props: PageProps<"/pick">) {
 
   return (
     <main className="flex flex-col gap-4">
-      <Link href="/" className="text-sm text-zinc-400 hover:text-zinc-200">
+      <Link href="/legacy" className="text-sm text-zinc-400 hover:text-zinc-200">
         ← Back to parlay
       </Link>
       <h1 className="text-xl font-bold">Pick a game</h1>

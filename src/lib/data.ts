@@ -54,7 +54,7 @@ export async function getViewer(): Promise<Profile> {
 
 export async function requireAdmin(): Promise<Profile> {
   const viewer = await getViewer();
-  if (!viewer.is_admin) redirect("/");
+  if (!viewer.is_admin) redirect("/legacy");
   return viewer;
 }
 
