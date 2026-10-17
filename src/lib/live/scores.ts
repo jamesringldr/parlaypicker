@@ -3,7 +3,7 @@ import { cached, oddsGet } from "@/lib/odds/the-odds-api";
 import { SPORTS, type Sport } from "@/lib/odds/types";
 import { getEspnScoreboard, getEspnSummary } from "./espn";
 import type { EspnGame } from "./espn-parse";
-import type { BoxScore, GameScore, Leg } from "./grade";
+import { legKey, normName, type BoxScore, type GameScore, type Leg } from "./grade";
 
 // Backup source. The scores endpoint costs 2 credits per call (the daysFrom form), so every
 // viewer shares one call per minute per sport, and it's only used when ESPN has no answer.
@@ -40,7 +40,7 @@ function fetchOddsApiScores(sport: Sport): Promise<Map<string, GameScore>> {
 }
 
 export interface LiveData {
-  // Both keyed by the leg's eventId (The Odds API's game id).
+  // Both keyed by legKey: the leg's eventId (The Odds API's game id), or its own id if it has none.
   scores: Map<string, GameScore>;
   boxes: Map<string, BoxScore>;
   // True when some scores came from the backup source (no game clock, no prop stats).
@@ -55,32 +55,42 @@ export interface LiveData {
 export async function getScores(legs: Leg[]): Promise<LiveData> {
   const now = Date.now();
   const started = legs.filter(
-    (l) => l.eventId && l.commenceTime && new Date(l.commenceTime).getTime() <= now,
+    (l) => l.commenceTime && new Date(l.commenceTime).getTime() <= now,
   );
   const data: LiveData = { scores: new Map(), boxes: new Map(), backup: false, at: now };
   if (started.length === 0) return data;
 
   // ESPN knows these games by team names, not by The Odds API's ids.
   const sportsStarted = [...new Set(started.map((l) => l.sport))];
-  const bySides = new Map<string, EspnGame>();
+  const games = new Map<Sport, EspnGame[]>();
   await Promise.all(
     sportsStarted.map(async (sport) => {
       try {
-        for (const g of await getEspnScoreboard(sport)) bySides.set(`${sport}|${g.homeTeam}|${g.awayTeam}`, g);
+        games.set(sport, await getEspnScoreboard(sport));
       } catch {
         // Fall through to the backup source below.
       }
     }),
   );
+  const sameTeam = (name: string, full: string, short: string) => {
+    const n = normName(name);
+    return n === normName(full) || n === normName(short);
+  };
   const espnGame = (leg: Leg) =>
-    leg.homeTeam && leg.awayTeam ? bySides.get(`${leg.sport}|${leg.homeTeam}|${leg.awayTeam}`) : undefined;
+    leg.homeTeam && leg.awayTeam
+      ? games
+          .get(leg.sport)
+          ?.find(
+            (g) => sameTeam(leg.homeTeam!, g.homeTeam, g.homeShort) && sameTeam(leg.awayTeam!, g.awayTeam, g.awayShort),
+          )
+      : undefined;
 
   // Group legs by game so each ESPN game is read once, however many legs are on it.
   const byGame = new Map<string, { sport: Sport; game: EspnGame; legs: Leg[] }>();
   for (const leg of started) {
     const game = espnGame(leg);
     if (!game) continue;
-    data.scores.set(leg.eventId!, game.score);
+    data.scores.set(legKey(leg), game.score);
     const key = `${leg.sport}:${game.id}`;
     const entry = byGame.get(key) ?? { sport: leg.sport, game, legs: [] };
     entry.legs.push(leg);
@@ -98,15 +108,15 @@ export async function getScores(legs: Leg[]): Promise<LiveData> {
       const summary = await getEspnSummary(sport, game.id).catch(() => null);
       if (!summary) return;
       for (const leg of gameLegs) {
-        if (summary.box) data.boxes.set(leg.eventId!, summary.box);
+        if (summary.box) data.boxes.set(legKey(leg), summary.box);
         if (needsPlay) {
-          data.scores.set(leg.eventId!, { ...game.score, lastPlay: summary.lastScoringPlay ?? "No scoring yet" });
+          data.scores.set(legKey(leg), { ...game.score, lastPlay: summary.lastScoringPlay ?? "No scoring yet" });
         }
       }
     }),
   );
 
-  const missing = started.filter((l) => l.kind !== "prop" && !data.scores.has(l.eventId!));
+  const missing = started.filter((l) => l.kind !== "prop" && !data.scores.has(legKey(l)));
   const sports = [...new Set(missing.map((l) => l.sport))];
   try {
     for (const sport of sports) {
