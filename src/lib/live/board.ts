@@ -1,7 +1,7 @@
 import "server-only";
 import { timingSafeEqual } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/server";
-import { gradeLeg, legScore, type Grade, type Leg, type Manual } from "./grade";
+import { gradeLeg, legKey, legScore, type Grade, type Leg, type Manual } from "./grade";
 import { getScores } from "./scores";
 
 const BOARD_ID = "current";
@@ -60,7 +60,7 @@ export async function archiveBoard(): Promise<string | null> {
 
   const { scores, boxes } = await getScores(legs);
   const grades: Grade[] = legs.map((leg) =>
-    gradeLeg(leg, legScore(leg, scores), leg.eventId ? boxes.get(leg.eventId) : undefined),
+    gradeLeg(leg, legScore(leg, scores), boxes.get(legKey(leg))),
   );
   const open = grades.filter((g) => g.state !== "hit" && g.state !== "miss" && g.state !== "push").length;
   if (open > 0) return `${open} leg${open === 1 ? " hasn't" : "s haven't"} settled yet. Mark ${open === 1 ? "it" : "them"} by hand first.`;

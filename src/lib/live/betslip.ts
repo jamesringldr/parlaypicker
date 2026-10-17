@@ -3,7 +3,7 @@ import { slipRows, type SlipLeg, type SlipRow } from "@/lib/betslip";
 import { sameOwner, tally, type Tally } from "@/lib/players";
 import { createAdminClient } from "@/lib/supabase/server";
 import { getBoard, getPastWeeks } from "./board";
-import { gradeLeg, legScore } from "./grade";
+import { gradeLeg, legKey, legScore } from "./grade";
 import { getRoster } from "./players";
 import { getScores } from "./scores";
 
@@ -65,7 +65,7 @@ export async function getBetSlip(requested: number | null): Promise<BetSlip> {
     // Graded as the games stand. Anything not settled yet is open.
     const { scores, boxes } = await getScores(board.legs);
     slipLegs = board.legs.map((l) => {
-      const { state } = gradeLeg(l, legScore(l, scores), l.eventId ? boxes.get(l.eventId) : undefined);
+      const { state } = gradeLeg(l, legScore(l, scores), boxes.get(legKey(l)));
       return {
         id: l.id,
         owner: l.owner,

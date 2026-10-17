@@ -81,8 +81,11 @@ export function normName(name: string): string {
 
 // The score to grade and show for a leg: a hand-set one, else the feed's.
 export function legScore(leg: Leg, scores: Map<string, GameScore>): GameScore | undefined {
-  return leg.sim ?? (leg.eventId ? scores.get(leg.eventId) : undefined);
+  return leg.sim ?? scores.get(legKey(leg));
 }
+
+// What a leg's live score and box score are filed under. Legs added by hand have no game id.
+export const legKey = (leg: Leg): string => leg.eventId ?? leg.id;
 
 // Bet types read "Any time TD scorer", not "touchdown".
 export function shortMarket(market: string): string {

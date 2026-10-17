@@ -6,6 +6,9 @@ export interface EspnGame {
   id: string;
   homeTeam: string;
   awayTeam: string;
+  // College teams are often saved by school alone ("Kansas State"), not the full name.
+  homeShort: string;
+  awayShort: string;
   score: GameScore;
   started: boolean;
 }
@@ -55,6 +58,8 @@ export function parseScoreboard(json: unknown): EspnGame[] {
     const homeTeam = isObj(home?.team) ? home.team.displayName : undefined;
     const awayTeam = isObj(away?.team) ? away.team.displayName : undefined;
     if (typeof homeTeam !== "string" || typeof awayTeam !== "string") continue;
+    const shortOf = (c: Json | undefined, full: string) =>
+      isObj(c?.team) && typeof c.team.location === "string" ? c.team.location : full;
 
     const status = isObj(event.status) ? event.status : {};
     const type = isObj(status.type) ? status.type : {};
@@ -67,6 +72,8 @@ export function parseScoreboard(json: unknown): EspnGame[] {
       id: event.id,
       homeTeam,
       awayTeam,
+      homeShort: shortOf(home, homeTeam),
+      awayShort: shortOf(away, awayTeam),
       started,
       score: {
         completed,

@@ -5,7 +5,7 @@ import { AutoRefresh } from "@/components/auto-refresh";
 import { Avatar } from "@/components/avatar";
 import { KickoffTime } from "@/components/kickoff-time";
 import { getBoard, LIVE_PATH } from "@/lib/live/board";
-import { gameIsLive, gradeLeg, legScore, parlayState, shortMarket, type Grade, type Leg, type LegKind, type LegState } from "@/lib/live/grade";
+import { gameIsLive, gradeLeg, legKey, legScore, parlayState, shortMarket, type Grade, type Leg, type LegKind, type LegState } from "@/lib/live/grade";
 import { legLogos } from "@/lib/live/logos";
 import { getRoster } from "@/lib/live/players";
 import { getScores } from "@/lib/live/scores";
@@ -223,7 +223,7 @@ export default async function LiveParlay(props: PageProps<"/live-board">) {
     const score = legScore(leg, scores);
     return {
       leg,
-      grade: gradeLeg(leg, score, leg.eventId ? boxes.get(leg.eventId) : undefined),
+      grade: gradeLeg(leg, score, boxes.get(legKey(leg))),
       live: gameIsLive(score),
       // Shown in place of the kickoff time while the game is on. A source with no game clock still says Live.
       clock: gameIsLive(score) ? (score?.clock ?? "Live") : undefined,
