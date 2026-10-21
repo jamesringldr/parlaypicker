@@ -4,13 +4,16 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Avatar } from "@/components/avatar";
-import { LIVE_PATH, type ArchivedLeg } from "@/lib/live/board";
+import { PickAction } from "@/components/header-action";
+import { type ArchivedLeg } from "@/lib/live/board";
 import { getRole } from "@/lib/live/activity-store";
 import { getBadges, getPlayerProfile, getRoster } from "@/lib/live/players";
 import { formatRecord, hitRate, playerBySlug } from "@/lib/players";
 import { formatPrice } from "@/lib/rules";
+import { getPicks, isDrafting } from "@/lib/slip/store";
 import { readSession, SESSION_COOKIE } from "@/lib/session";
 import { BADGE_EMOJI } from "@/lib/stats";
+import { EditPick } from "./edit-pick";
 
 const RESULT = {
   hit: { text: "Hit", className: "text-emerald-400" },
@@ -52,9 +55,13 @@ export default async function PlayerPage(props: PageProps<"/[player]">) {
   if (!profile) notFound();
   const others = roster.filter((p) => p.slug !== slug.toLowerCase());
 
+  // While picks are open this week's pick is still a draft, not yet on the live board.
+  const drafting = await isDrafting(profile.current.weekNumber);
+  const draft = drafting ? (await getPicks(profile.current.weekNumber)).find((p) => p.slug === slug.toLowerCase())?.leg : undefined;
+
   const { record } = profile;
   const rate = hitRate(record);
-  // "My Legs" on your own page. On someone else's it's theirs.
+  // "My Picks" on your own page. On someone else's it's theirs.
   const me = readSession((await cookies()).get(SESSION_COOKIE)?.value);
   const isOwn = me === slug.toLowerCase();
   // Only the super admin gets the Activity link, and only on their own page.
@@ -63,10 +70,24 @@ export default async function PlayerPage(props: PageProps<"/[player]">) {
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 px-4 pb-28 pt-6">
       <header className="flex items-center justify-between gap-3">
-        <h1 className="text-xl font-bold tracking-tight">{isOwn ? "My Legs" : `${profile.name}'s Legs`}</h1>
-        <Link href={LIVE_PATH} className="btn shrink-0">
-          Live Board
-        </Link>
+        <h1 className="text-xl font-bold tracking-tight">{isOwn ? "My Picks" : `${profile.name}'s Picks`}</h1>
+        {drafting && isOwn ? (
+          draft ? (
+            <EditPick
+              label={draft.label}
+              detail={draft.matchup ?? draft.market}
+              price={draft.price === undefined ? undefined : formatPrice(draft.price)}
+              trigger="Edit Pick"
+              className="btn shrink-0"
+            />
+          ) : (
+            <Link href="/games" className="btn shrink-0">
+              Make Pick
+            </Link>
+          )
+        ) : (
+          <PickAction />
+        )}
       </header>
 
       <section className="flex items-center gap-3">
@@ -87,18 +108,50 @@ export default async function PlayerPage(props: PageProps<"/[player]">) {
         </Link>
       )}
 
-      {profile.current.legs.length > 0 && (
+      {(drafting || profile.current.legs.length > 0) && (
         <section className="card flex flex-col">
-          <div className="flex items-baseline justify-between gap-3">
+          <div className="flex items-center justify-between gap-3">
             <h2 className="font-bold">
               Week {profile.current.weekNumber} <span className="font-normal text-zinc-400">· this week</span>
             </h2>
-            {profile.current.role && (
-              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${ROLE[profile.current.role].className}`}>
-                {ROLE[profile.current.role].text}
-              </span>
-            )}
+            <div className="flex shrink-0 items-center gap-2">
+              {profile.current.role && (
+                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${ROLE[profile.current.role].className}`}>
+                  {ROLE[profile.current.role].text}
+                </span>
+              )}
+              {drafting &&
+                isOwn &&
+                (draft ? (
+                  <EditPick
+                    label={draft.label}
+                    detail={draft.matchup ?? draft.market}
+                    price={draft.price === undefined ? undefined : formatPrice(draft.price)}
+                  />
+                ) : (
+                  <Link href="/games" className="btn !py-1.5">
+                    Pick
+                  </Link>
+                ))}
+            </div>
           </div>
+          {drafting &&
+            (draft ? (
+              <ul>
+                <li className="flex items-baseline justify-between gap-3 py-2">
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold">{draft.label}</p>
+                    <p className="truncate text-xs text-zinc-400">{draft.matchup ?? draft.market}</p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="text-sm font-semibold text-zinc-300">Not final</p>
+                    {draft.price !== undefined && <p className="text-xs text-zinc-400">{formatPrice(draft.price)}</p>}
+                  </div>
+                </li>
+              </ul>
+            ) : (
+              <p className="py-2 text-sm text-zinc-500">No pick yet</p>
+            ))}
           <ul>
             {profile.current.legs.map(({ leg, grade }) => (
               <li key={leg.id} className="flex items-baseline justify-between gap-3 py-2">
