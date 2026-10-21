@@ -33,7 +33,7 @@ export default async function Activity() {
       <header className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-bold tracking-tight">Activity</h1>
         <Link href={`/${me}`} className="text-sm text-blue-400 hover:underline">
-          My Legs
+          My Picks
         </Link>
       </header>
 

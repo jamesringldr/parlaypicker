@@ -95,7 +95,7 @@ export default async function BetSlipPage(props: PageProps<"/bet-slip">) {
         <h1 className="text-xl font-bold tracking-tight">Bet Slips</h1>
         {/* While picks are open the button is about your pick; once the slip is final it's the live board. */}
         <Link href={slip.drafting ? "/games" : LIVE_PATH} className="btn shrink-0">
-          {slip.drafting ? (myRow?.status === "missing" ? "Pick" : "Edit pick") : "Live Board"}
+          {slip.drafting ? (myRow?.status === "missing" ? "Make Pick" : "Edit Pick") : "Live Board"}
         </Link>
       </header>
 

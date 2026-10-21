@@ -3,6 +3,7 @@ import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { connection } from "next/server";
 import { AutoRefresh } from "@/components/auto-refresh";
+import { BoardAction } from "@/components/header-action";
 import type { GameCard, Side } from "@/lib/games/espn-games";
 import {
   CONFERENCES,
@@ -21,7 +22,7 @@ import { ForecastIcon } from "./forecast-icon";
 import { PickLine } from "./pick-line";
 import { kickoffShort, Line, signed } from "./shared";
 
-export const metadata: Metadata = { title: "Board | Low-T Parlay", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: "Lines | Low-T Parlay", robots: { index: false, follow: false } };
 
 // Each price box is a pick button; the spec says which bet it is.
 const spec = (game: GameCard, slate: string, kind: "moneyline" | "spread" | "total", side: "home" | "away" | "over" | "under", point: number | null): PickSpec => ({
@@ -222,9 +223,7 @@ export default async function Games(props: PageProps<"/games">) {
 
       <header className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-bold tracking-tight">This Week&apos;s Board</h1>
-        <Link href="/bet-slip" className="btn shrink-0">
-          Bet Slip
-        </Link>
+        <BoardAction />
       </header>
 
       <nav className="flex gap-1 rounded-xl bg-zinc-900 p-1" aria-label="League">

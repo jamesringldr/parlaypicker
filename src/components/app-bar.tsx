@@ -4,16 +4,16 @@ import { CalendarDays, House, Receipt, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-// `me` is the signed-in player's slug. Signed out, My Legs sends them to sign in.
+// `me` is the signed-in player's slug. Signed out, My Picks sends them to sign in.
 export function AppBar({ me, missingPick }: { me: string | null; missingPick: boolean }) {
   const pathname = usePathname();
   if (pathname.startsWith("/login")) return null;
 
   const tabs = [
     { label: "Home", href: "/", icon: House, active: pathname === "/" },
-    { label: "Board", href: "/games", icon: CalendarDays, active: pathname.startsWith("/games"), badge: missingPick },
+    { label: "Lines", href: "/games", icon: CalendarDays, active: pathname.startsWith("/games"), badge: missingPick },
     { label: "Bet Slips", href: "/bet-slip", icon: Receipt, active: pathname.startsWith("/bet-slip") },
-    { label: "My Legs", href: me ? `/${me}` : "/login", icon: UserRound, active: !!me && pathname === `/${me}` },
+    { label: "My Picks", href: me ? `/${me}` : "/login", icon: UserRound, active: !!me && pathname === `/${me}` },
   ];
 
   return (
