@@ -46,6 +46,10 @@ function fetchSlate(path: string): Promise<Slate> {
 // This week's NFL games.
 export const getNflSlate = () => fetchSlate("/nfl/scoreboard");
 
+// One day's games, as `espnDate` writes it ("20261025"). Used to find games before ESPN's default week reaches them.
+export const getNflSlateOn = (date: string) => fetchSlate(`/nfl/scoreboard?dates=${date}`);
+export const getCollegeSlateOn = (date: string) => fetchSlate(`/college-football/scoreboard?groups=80&limit=300&dates=${date}`);
+
 // This week's FBS games: every game with a ranked team, or one conference's games.
 export async function getCollegeSlate(filter: CollegeFilter): Promise<Slate> {
   const conference = CONFERENCES.find((c) => c.key === filter);

@@ -13,6 +13,8 @@ import {
   type CollegeFilter,
   type Slate,
 } from "@/lib/games/scoreboard";
+import { applyOpens } from "@/lib/games/opens";
+import { getLineOpens } from "@/lib/games/opens-store";
 import { formatMove, isMoveKind, sortByMovement, spreadMove, totalMove, type MoveKind } from "@/lib/games/movement";
 import { findGameProps, isPropTab } from "@/lib/odds/props";
 import { getUpcomingProps, type UpcomingProps } from "@/lib/odds/props-store";
@@ -174,7 +176,12 @@ export default async function Games(props: PageProps<"/games">) {
   let error: string | null = null;
   try {
     if (onProps) propsData = await getUpcomingProps();
-    else data = ncaa ? await getCollegeSlate(filter) : await getNflSlate();
+    else {
+      const slate = ncaa ? await getCollegeSlate(filter) : await getNflSlate();
+      // The opening line is the one we saved at the start of the week. ESPN's own can be from the preseason.
+      const opens = await getLineOpens(ncaa ? "ncaa" : "nfl").catch(() => null);
+      data = { ...slate, games: slate.games.map((g) => applyOpens(g, opens)) };
+    }
   } catch (e) {
     error = e instanceof Error ? e.message : "Couldn't load the games.";
   }

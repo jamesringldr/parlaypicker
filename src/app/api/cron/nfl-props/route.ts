@@ -1,21 +1,14 @@
-import { timingSafeEqual } from "node:crypto";
 import { revalidatePath } from "next/cache";
+import { cronAuthorized } from "@/lib/cron-auth";
 import { archiveBoard, LIVE_PATH } from "@/lib/live/board";
 import { isPullTime, isTuesday } from "@/lib/odds/props";
 import { pullNflProps } from "@/lib/odds/props-job";
 import { refreshSnapshotPhotos } from "@/lib/odds/props-store";
 
-function authorized(request: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  const given = request.headers.get("authorization") ?? "";
-  const expected = `Bearer ${secret}`;
-  return !!secret && given.length === expected.length && timingSafeEqual(Buffer.from(given), Buffer.from(expected));
-}
-
 // Vercel calls this on a schedule (vercel.json), sending the CRON_SECRET. `?force=1` runs it any time,
 // for a first pull or a retry.
 export async function GET(request: Request) {
-  if (!authorized(request)) return new Response("Unauthorized", { status: 401 });
+  if (!cronAuthorized(request)) return new Response("Unauthorized", { status: 401 });
 
   const params = new URL(request.url).searchParams;
 
