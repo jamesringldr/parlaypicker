@@ -4,7 +4,6 @@ export function Avatar({
   className = "size-20 text-3xl",
   badge,
   corner,
-  award,
   badgeClass = "text-sm",
 }: {
   name: string;
@@ -14,8 +13,6 @@ export function Avatar({
   badge?: string;
   // An emoji pinned to the top-left corner.
   corner?: string;
-  // An emoji pinned to the bottom-right corner.
-  award?: string;
   badgeClass?: string;
 }) {
   return (
@@ -33,11 +30,6 @@ export function Avatar({
       {corner && (
         <span className={`absolute -left-1.5 -top-1.5 leading-none drop-shadow ${badgeClass}`} aria-hidden>
           {corner}
-        </span>
-      )}
-      {award && (
-        <span className={`absolute -bottom-1.5 -right-1.5 leading-none drop-shadow ${badgeClass}`} aria-hidden>
-          {award}
         </span>
       )}
       {badge && (

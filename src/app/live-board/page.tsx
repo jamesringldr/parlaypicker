@@ -155,7 +155,7 @@ function LegRow({
   renderedAt: number;
   // The owner's profile photo, when they have one.
   photoUrl: string | null;
-  // The owner's emojis for the week's scorers and best and worst picks.
+  // The owner's best or worst pick emoji from last week, if they have one.
   marks?: Marks;
 }) {
   const accent = settled ? "text-zinc-100" : "text-blue-400";
