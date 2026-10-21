@@ -3,7 +3,7 @@ import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { connection } from "next/server";
 import { AutoRefresh } from "@/components/auto-refresh";
-import type { GameCard, Price, Side } from "@/lib/games/espn-games";
+import type { GameCard, Side } from "@/lib/games/espn-games";
 import {
   CONFERENCES,
   getCollegeSlate,
@@ -15,22 +15,46 @@ import {
 import { findGameProps, isPropTab } from "@/lib/odds/props";
 import { getUpcomingProps, type UpcomingProps } from "@/lib/odds/props-store";
 import { formatPrice } from "@/lib/rules";
+import type { PickSpec } from "@/lib/slip/legs";
 import { GamesView, PlayersView, type TeamInfo, type VenueInfo } from "./props-view";
 import { ForecastIcon } from "./forecast-icon";
+import { PickLine } from "./pick-line";
 import { kickoffShort, Line, signed } from "./shared";
 
 export const metadata: Metadata = { title: "Games | Low-T Parlay", robots: { index: false, follow: false } };
 
-const spreadLine = (p: Price | null) =>
-  p ? <Line top={p.line === null ? "-" : signed(p.line)} bottom={formatPrice(p.odds)} /> : <Line top="-" bottom="" />;
+// Each price box is a pick button; the spec says which bet it is.
+const spec = (game: GameCard, slate: string, kind: "moneyline" | "spread" | "total", side: "home" | "away" | "over" | "under"): PickSpec => ({
+  src: "game",
+  slate,
+  gameId: game.id,
+  kind,
+  side,
+  away: game.away.name,
+  home: game.home.name,
+});
 
-const totalLine = (p: Price | null, prefix: "o" | "u") =>
-  p ? <Line top={p.line === null ? "-" : `${prefix}${p.line}`} bottom={formatPrice(p.odds)} /> : <Line top="-" bottom="" />;
+function Spread({ game, slate, which }: { game: GameCard; slate: string; which: "away" | "home" }) {
+  const p = game.lines?.spread[which];
+  if (!p || p.line === null) return <Line top="-" bottom="" />;
+  return <PickLine spec={spec(game, slate, "spread", which)} top={signed(p.line)} bottom={formatPrice(p.odds)} />;
+}
 
-const mlLine = (odds: number | null) =>
-  odds === null ? <Line top="-" bottom="" /> : <Line top={formatPrice(odds)} bottom="ML" />;
+// The away row carries the over and the home row the under.
+function Total({ game, slate, which }: { game: GameCard; slate: string; which: "away" | "home" }) {
+  const over = which === "away";
+  const p = over ? game.lines?.total.over : game.lines?.total.under;
+  if (!p || p.line === null) return <Line top="-" bottom="" />;
+  return <PickLine spec={spec(game, slate, "total", over ? "over" : "under")} top={`${over ? "o" : "u"}${p.line}`} bottom={formatPrice(p.odds)} />;
+}
 
-function TeamRow({ side, game, which }: { side: Side; game: GameCard; which: "away" | "home" }) {
+function Moneyline({ game, slate, which }: { game: GameCard; slate: string; which: "away" | "home" }) {
+  const odds = game.lines?.moneyline[which] ?? null;
+  if (odds === null) return <Line top="-" bottom="" />;
+  return <PickLine spec={spec(game, slate, "moneyline", which)} top={formatPrice(odds)} bottom="ML" />;
+}
+
+function TeamRow({ side, game, which, slate }: { side: Side; game: GameCard; which: "away" | "home"; slate: string }) {
   const { lines, state } = game;
   const open = lines?.open;
   // Before kickoff the left column is where the lines opened: the favorite's spread on its row, the total on the other.
@@ -62,9 +86,9 @@ function TeamRow({ side, game, which }: { side: Side; game: GameCard; which: "aw
           <p className="hidden w-8 shrink-0 text-center text-sm text-zinc-400 min-[400px]:block sm:w-10">{openText}</p>
           {lines && (
             <div className="flex gap-1 sm:gap-1.5">
-              {spreadLine(lines.spread[which])}
-              {totalLine(which === "away" ? lines.total.over : lines.total.under, which === "away" ? "o" : "u")}
-              {mlLine(lines.moneyline[which])}
+              <Spread game={game} slate={slate} which={which} />
+              <Total game={game} slate={slate} which={which} />
+              <Moneyline game={game} slate={slate} which={which} />
             </div>
           )}
         </>
@@ -75,11 +99,11 @@ function TeamRow({ side, game, which }: { side: Side; game: GameCard; which: "aw
   );
 }
 
-function Card({ game, propsId }: { game: GameCard; propsId?: string }) {
+function Card({ game, propsId, slate }: { game: GameCard; propsId?: string; slate: string }) {
   return (
     <article className="flex flex-col gap-3 rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
-      <TeamRow side={game.away} game={game} which="away" />
-      <TeamRow side={game.home} game={game} which="home" />
+      <TeamRow side={game.away} game={game} which="away" slate={slate} />
+      <TeamRow side={game.home} game={game} which="home" slate={slate} />
       <div className="flex items-center justify-between gap-3">
         {game.state === "pre" ? (
           <p className="flex min-w-0 items-center gap-1.5 text-sm text-zinc-400">
@@ -105,7 +129,7 @@ function Card({ game, propsId }: { game: GameCard; propsId?: string }) {
   );
 }
 
-function Section({ title, games, open, propsIds }: { title: string; games: GameCard[]; open: boolean; propsIds: Map<string, string> }) {
+function Section({ title, games, open, propsIds, slate }: { title: string; games: GameCard[]; open: boolean; propsIds: Map<string, string>; slate: string }) {
   if (games.length === 0) return null;
   return (
     <details open={open} className="group">
@@ -115,7 +139,7 @@ function Section({ title, games, open, propsIds }: { title: string; games: GameC
       </summary>
       <div className="flex flex-col gap-3">
         {games.map((g) => (
-          <Card key={g.id} game={g} propsId={g.state === "pre" ? propsIds.get(g.id) : undefined} />
+          <Card key={g.id} game={g} propsId={g.state === "pre" ? propsIds.get(g.id) : undefined} slate={slate} />
         ))}
       </div>
     </details>
@@ -178,6 +202,8 @@ export default async function Games(props: PageProps<"/games">) {
     }
   }
 
+  // Which ESPN slate a pick came from, so the server can find the game again.
+  const slate = ncaa ? filter : "nfl";
   const games = data?.games ?? [];
   const live = games.filter((g) => g.state === "in");
   const upcoming = games.filter((g) => g.state === "pre");
@@ -288,9 +314,9 @@ export default async function Games(props: PageProps<"/games">) {
         <p className="card text-sm text-zinc-400">{ncaa && filter === "top25" ? "No ranked teams play this week." : "No games this week."}</p>
       )}
 
-      <Section title="Live" games={live} open propsIds={propsIds} />
-      <Section title="Upcoming" games={upcoming} open propsIds={propsIds} />
-      <Section title="Final" games={final} open={live.length === 0 && upcoming.length === 0} propsIds={propsIds} />
+      <Section title="Live" slate={slate} games={live} open propsIds={propsIds} />
+      <Section title="Upcoming" slate={slate} games={upcoming} open propsIds={propsIds} />
+      <Section title="Final" slate={slate} games={final} open={live.length === 0 && upcoming.length === 0} propsIds={propsIds} />
       {games.some((g) => g.lines) && (
         <p className="text-center text-xs text-zinc-500">Lines from DraftKings via ESPN. FanDuel&apos;s can differ.</p>
       )}

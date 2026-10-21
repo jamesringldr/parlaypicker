@@ -13,6 +13,8 @@ import {
 } from "@/lib/odds/props";
 import type { UpcomingProps } from "@/lib/odds/props-store";
 import { formatPrice } from "@/lib/rules";
+import type { PickSpec } from "@/lib/slip/legs";
+import { PickLine } from "./pick-line";
 import { PlayerSearch } from "./player-search";
 import { PropSelect } from "./prop-select";
 import type { Forecast, Venue } from "@/lib/games/espn-games";
@@ -23,16 +25,38 @@ const TABS = Object.keys(PROP_TABS) as PropTab[];
 
 const matchup = (g: GameProps) => `${nickname(g.awayTeam)} @ ${nickname(g.homeTeam)}`;
 
-// The price boxes for one player: over and under on a line, or the anytime TD price.
-function Boxes({ tab, prop, className }: { tab: PropTab; prop: PlayerProp; className?: string }) {
-  if (!PROP_TABS[tab].yards) {
-    return <Line top={prop.yes === null ? "-" : formatPrice(prop.yes)} bottom="Anytime" className={className} />;
+// The price boxes for one player: over and under on a line, or the anytime TD price. Each is a pick button.
+function Boxes({ tab, prop, game, className }: { tab: PropTab; prop: PlayerProp; game: GameProps; className?: string }) {
+  const spec = (side: "over" | "under" | "yes"): PickSpec => ({
+    src: "prop",
+    eventId: game.eventId,
+    tab,
+    player: prop.player,
+    point: prop.point,
+    side,
+    away: game.awayTeam,
+    home: game.homeTeam,
+  });
+  const box = (side: "over" | "under" | "yes", top: string, price: number | null, label?: string) =>
+    price === null ? (
+      <Line top={top} bottom="" className={className} />
+    ) : (
+      <PickLine spec={spec(side)} top={top} bottom={label ?? formatPrice(price)} className={className} />
+    );
+
+  if (!PROP_TABS[tab].yards) return box("yes", prop.yes === null ? "-" : formatPrice(prop.yes), prop.yes, "Anytime");
+  if (prop.point === null) {
+    return (
+      <>
+        <Line top="-" bottom="" className={className} />
+        <Line top="-" bottom="" className={className} />
+      </>
+    );
   }
-  const point = prop.point === null ? "-" : null;
   return (
     <>
-      <Line top={point ?? `o${prop.point}`} bottom={prop.over === null ? "" : formatPrice(prop.over)} className={className} />
-      <Line top={point ?? `u${prop.point}`} bottom={prop.under === null ? "" : formatPrice(prop.under)} className={className} />
+      {box("over", `o${prop.point}`, prop.over)}
+      {box("under", `u${prop.point}`, prop.under)}
     </>
   );
 }
@@ -42,6 +66,7 @@ function Row({
   sub,
   tab,
   prop,
+  game,
   photo,
   avatar = true,
 }: {
@@ -49,6 +74,7 @@ function Row({
   sub?: string;
   tab: PropTab;
   prop: PlayerProp;
+  game: GameProps;
   photo?: string;
   // Off for a row that's a stat line, not a player.
   avatar?: boolean;
@@ -63,7 +89,7 @@ function Row({
         </div>
       </div>
       <div className="flex shrink-0 gap-1.5">
-        <Boxes tab={tab} prop={prop} />
+        <Boxes tab={tab} prop={prop} game={game} />
       </div>
     </li>
   );
@@ -100,7 +126,7 @@ function PlayerCard({ entry, photo }: { entry: ReturnType<typeof playerIndex>[nu
       </div>
       <ul className="mt-2">
         {TABS.filter((t) => entry.props[t]).map((t) => (
-          <Row key={t} name={PROP_TABS[t].label} tab={t} prop={entry.props[t]!} avatar={false} />
+          <Row key={t} name={PROP_TABS[t].label} tab={t} prop={entry.props[t]!} game={entry.game} avatar={false} />
         ))}
       </ul>
     </section>
@@ -136,7 +162,7 @@ export function PlayersView({ props, player, prop }: { props: UpcomingProps | nu
           </h2>
           <ul>
             {top.map(({ game, prop: p }) => (
-              <Row key={`${game.eventId}|${p.player}`} name={p.player} sub={matchup(game)} tab={prop} prop={p} photo={props.photos[p.player]} />
+              <Row key={`${game.eventId}|${p.player}`} name={p.player} sub={matchup(game)} tab={prop} prop={p} game={game} photo={props.photos[p.player]} />
             ))}
           </ul>
         </section>
@@ -150,7 +176,7 @@ export function PlayersView({ props, player, prop }: { props: UpcomingProps | nu
 const availableTabs = (game: GameProps) => TABS.filter((t) => (game.markets[PROP_TABS[t].market] ?? []).length > 0);
 
 // One player in a narrow column: photo and short name, with the price boxes underneath.
-function Cell({ prop, tab, photo }: { prop: PlayerProp; tab: PropTab; photo?: string }) {
+function Cell({ prop, tab, game, photo }: { prop: PlayerProp; tab: PropTab; game: GameProps; photo?: string }) {
   return (
     <li className="flex flex-col gap-1.5 border-b border-zinc-800 py-2 last:border-b-0">
       <div className="flex items-center gap-1.5">
@@ -158,7 +184,7 @@ function Cell({ prop, tab, photo }: { prop: PlayerProp; tab: PropTab; photo?: st
         <p className="min-w-0 truncate text-[13px] font-semibold">{shortName(prop.player)}</p>
       </div>
       <div className="flex gap-1">
-        <Boxes tab={tab} prop={prop} className="min-w-0 flex-1" />
+        <Boxes tab={tab} prop={prop} game={game} className="min-w-0 flex-1" />
       </div>
     </li>
   );
@@ -194,7 +220,7 @@ function GameBlock({
       <p className="pb-1 text-xs font-semibold uppercase tracking-wide text-zinc-500">{nickname(team)}</p>
       <ul>
         {list.map((prop) => (
-          <Cell key={`${prop.player}|${prop.point}`} prop={prop} tab={active} photo={photos[prop.player]} />
+          <Cell key={`${prop.player}|${prop.point}`} prop={prop} tab={active} game={game} photo={photos[prop.player]} />
         ))}
       </ul>
     </div>
@@ -227,7 +253,7 @@ function GameBlock({
           <p className="pb-1 text-xs font-semibold uppercase tracking-wide text-zinc-500">Team unknown</p>
           <ul className="grid grid-cols-2 gap-x-4">
             {other.map((prop) => (
-              <Cell key={`${prop.player}|${prop.point}`} prop={prop} tab={active} photo={photos[prop.player]} />
+              <Cell key={`${prop.player}|${prop.point}`} prop={prop} tab={active} game={game} photo={photos[prop.player]} />
             ))}
           </ul>
         </div>
