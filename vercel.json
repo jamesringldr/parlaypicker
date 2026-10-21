@@ -1,6 +1,10 @@
 {
   "crons": [
     { "path": "/api/cron/nfl-props", "schedule": "0 17 * * 2-4" },
-    { "path": "/api/cron/nfl-props", "schedule": "0 18 * * 2-4" }
+    { "path": "/api/cron/nfl-props", "schedule": "0 18 * * 2-4" },
+    { "path": "/api/cron/line-opens?league=ncaa", "schedule": "0 8 * * 0" },
+    { "path": "/api/cron/line-opens?league=ncaa", "schedule": "0 9 * * 0" },
+    { "path": "/api/cron/line-opens?league=nfl", "schedule": "0 8 * * 1" },
+    { "path": "/api/cron/line-opens?league=nfl", "schedule": "0 9 * * 1" }
   ]
 }
