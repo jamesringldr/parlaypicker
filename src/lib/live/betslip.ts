@@ -6,6 +6,7 @@ import { getBoard, getPastWeeks } from "./board";
 import { gradeLeg, legKey, legScore } from "./grade";
 import { getRoster } from "./players";
 import { getScores } from "./scores";
+import { getPicks, isDrafting } from "@/lib/slip/store";
 
 export interface Scorer {
   name: string;
@@ -19,6 +20,8 @@ export interface BetSlip {
   selected: number;
   // Closed weeks are archived and settled. The current week is the live board.
   closed: boolean;
+  // The current week before an admin finalizes it: the players' picks, not yet on the live board.
+  drafting: boolean;
   rows: SlipRow[];
   photos: Map<string, string | null>;
   picksIn: number;
@@ -45,6 +48,7 @@ export async function getBetSlip(requested: number | null): Promise<BetSlip> {
   const weeks = [...past.map((w) => w.weekNumber).sort((a, b) => a - b), current];
   const selected = requested !== null && weeks.includes(requested) ? requested : current;
   const closed = selected !== current;
+  const drafting = !closed && (await isDrafting(current));
 
   let slipLegs: SlipLeg[];
   let record: Tally | null = null;
@@ -61,6 +65,15 @@ export async function getBetSlip(requested: number | null): Promise<BetSlip> {
     }));
     record = tally(week.legs.map((l) => l.result));
     totalPrice = week.totalPrice;
+  } else if (drafting) {
+    slipLegs = (await getPicks(current)).map(({ leg }) => ({
+      id: leg.id,
+      owner: leg.owner,
+      label: leg.label,
+      matchup: leg.matchup,
+      price: leg.price,
+      status: "open",
+    }));
   } else {
     // Graded as the games stand. Anything not settled yet is open.
     const { scores, boxes } = await getScores(board.legs);
@@ -92,6 +105,7 @@ export async function getBetSlip(requested: number | null): Promise<BetSlip> {
     current,
     selected,
     closed,
+    drafting,
     rows,
     photos,
     picksIn: roster.filter((p) => slipLegs.some((l) => sameOwner(l.owner, p.name))).length,

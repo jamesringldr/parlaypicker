@@ -4,11 +4,14 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { Avatar } from "@/components/avatar";
+import { ErrorBanner } from "@/components/error-banner";
 import type { SlipStatus } from "@/lib/betslip";
 import { getBetSlip, type Scorer } from "@/lib/live/betslip";
 import { formatRecord } from "@/lib/players";
 import { LIVE_PATH } from "@/lib/live/board";
+import { canFinalize, getSessionViewer } from "@/lib/slip/store";
 import { formatPrice, toWin } from "@/lib/rules";
+import { FinalizeButton } from "./finalize-button";
 
 export const metadata: Metadata = { title: "Bet Slips | Low-T Parlay", robots: { index: false, follow: false } };
 
@@ -24,7 +27,7 @@ const BADGE: Record<SlipStatus, { text: string; className: string }> = {
 
 const hrefFor = (week: number, current: number) => (week === current ? "/bet-slip" : `/bet-slip?week=${week}`);
 
-function WeekNav({ weeks, selected, current }: { weeks: number[]; selected: number; current: number }) {
+function WeekNav({ weeks, selected, current, drafting }: { weeks: number[]; selected: number; current: number; drafting: boolean }) {
   const i = weeks.indexOf(selected);
   const prev = weeks[i - 1];
   const next = weeks[i + 1];
@@ -42,7 +45,7 @@ function WeekNav({ weeks, selected, current }: { weeks: number[]; selected: numb
       )}
       <div className="text-center">
         <h2 className="text-xl font-bold tracking-tight">Week {selected}</h2>
-        <p className="text-xs uppercase tracking-widest text-zinc-400">{selected === current ? "This week" : "Final"}</p>
+        <p className="text-xs uppercase tracking-widest text-zinc-400">{selected !== current ? "Final" : drafting ? "Picks open" : "This week"}</p>
       </div>
       {next ? (
         <Link href={hrefFor(next, current)} aria-label={`Week ${next}`} className={`${arrow} hover:bg-zinc-800`}>
@@ -80,6 +83,8 @@ export default async function BetSlipPage(props: PageProps<"/bet-slip">) {
   const { week } = await props.searchParams;
   const requested = typeof week === "string" && /^\d+$/.test(week) ? Number(week) : null;
   const slip = await getBetSlip(requested);
+  const viewer = await getSessionViewer();
+  const myRow = slip.rows.find((r) => r.slug === viewer?.slug);
 
   const decided = slip.record ? slip.record.wins + slip.record.losses : 0;
 
@@ -93,7 +98,9 @@ export default async function BetSlipPage(props: PageProps<"/bet-slip">) {
         </Link>
       </header>
 
-      <WeekNav weeks={slip.weeks} selected={slip.selected} current={slip.current} />
+      <ErrorBanner searchParams={props.searchParams} />
+
+      <WeekNav weeks={slip.weeks} selected={slip.selected} current={slip.current} drafting={slip.drafting} />
 
       <section className="card flex flex-col gap-4">
         {slip.closed && slip.record ? (
@@ -125,6 +132,20 @@ export default async function BetSlipPage(props: PageProps<"/bet-slip">) {
           <Scorers label="Low scorer" tone="!text-red-400" people={slip.low} />
         </div>
       </section>
+
+      {slip.drafting && (
+        <div className="card flex flex-col gap-3">
+          <p className="text-sm text-zinc-300">
+            Picks are open. An admin finalizes the slip, which puts it on the live board.
+          </p>
+          {viewer && myRow?.status === "missing" && (
+            <Link href="/games" className="btn">
+              Make your pick
+            </Link>
+          )}
+          {viewer && canFinalize(viewer.role) && <FinalizeButton missing={slip.total - slip.picksIn} />}
+        </div>
+      )}
 
       <ul className="card !p-0">
         {slip.rows.map((row) => {
