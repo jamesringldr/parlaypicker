@@ -28,3 +28,19 @@ export function totalMove(lines: Lines): number | null {
 export function formatMove(delta: number): string {
   return delta === 0 ? "0" : `${delta > 0 ? "▲" : "▼"}${Math.abs(delta)}`;
 }
+
+// How big the move is, whichever way it went. The same for both teams on a spread.
+export function moveSize(lines: Lines | null, kind: MoveKind): number | null {
+  if (!lines) return null;
+  const delta = kind === "spread" ? spreadMove(lines, "home") : totalMove(lines);
+  return delta === null ? null : Math.abs(delta);
+}
+
+// Biggest move first. Games with no opening line go last, and ties keep the order they came in (kickoff).
+export function sortByMovement<G extends { lines: Lines | null }>(games: G[], kind: MoveKind): G[] {
+  return [...games].sort((a, b) => {
+    const x = moveSize(a.lines, kind);
+    const y = moveSize(b.lines, kind);
+    return x === y ? 0 : x === null ? 1 : y === null ? -1 : y - x;
+  });
+}
