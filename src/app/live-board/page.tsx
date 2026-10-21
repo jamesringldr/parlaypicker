@@ -7,7 +7,7 @@ import { KickoffTime } from "@/components/kickoff-time";
 import { getBoard, LIVE_PATH } from "@/lib/live/board";
 import { gameIsLive, gradeLeg, legKey, legScore, parlayState, shortMarket, type Grade, type Leg, type LegKind, type LegState } from "@/lib/live/grade";
 import { legLogos } from "@/lib/live/logos";
-import { getRoster, getWeekRoles, roleCorner } from "@/lib/live/players";
+import { getAvatarMarks, getRoster, marksOf, type Marks } from "@/lib/live/players";
 import { getScores } from "@/lib/live/scores";
 import { matchupLine } from "@/lib/live/teams";
 import { sameOwner } from "@/lib/players";
@@ -143,7 +143,7 @@ function LegRow({
   matchup,
   renderedAt,
   photoUrl,
-  corner,
+  marks,
 }: {
   leg: Leg;
   grade: Grade;
@@ -155,8 +155,8 @@ function LegRow({
   renderedAt: number;
   // The owner's profile photo, when they have one.
   photoUrl: string | null;
-  // The week's high or low scorer emoji, if the owner is one.
-  corner?: string;
+  // The owner's emojis for the week's scorers and best and worst picks.
+  marks?: Marks;
 }) {
   const accent = settled ? "text-zinc-100" : "text-blue-400";
   const status = grade.label ?? STATUS_TEXT[grade.state];
@@ -176,7 +176,7 @@ function LegRow({
             </p>
           </div>
           <div className="shrink-0 self-start" title={leg.owner} aria-label={`Picked by ${leg.owner}`}>
-            <Avatar name={leg.owner} photoUrl={photoUrl} className="size-8 text-sm" corner={corner} badgeClass="text-xs" />
+            <Avatar name={leg.owner} photoUrl={photoUrl} className="size-8 text-sm" {...marks} badgeClass="text-xs" />
           </div>
         </div>
         {/* Before kickoff the start time sits under the matchup. Once it's on, the clock takes the right side. */}
@@ -220,7 +220,7 @@ export default async function LiveParlay(props: PageProps<"/live-board">) {
   const view = tab === "settled" ? "settled" : "open";
 
   const { legs, totalPrice } = await getBoard();
-  const [{ scores, boxes, backup, error, at: renderedAt }, roster, roles] = await Promise.all([getScores(legs), getRoster(), getWeekRoles()]);
+  const [{ scores, boxes, backup, error, at: renderedAt }, roster, allMarks] = await Promise.all([getScores(legs), getRoster(), getAvatarMarks()]);
   const photoOf = (owner: string) => roster.find((p) => sameOwner(p.name, owner))?.photoUrl ?? null;
   const graded = legs.map((leg) => {
     const score = legScore(leg, scores);
@@ -322,7 +322,7 @@ export default async function LiveParlay(props: PageProps<"/live-board">) {
             matchup={matchup}
             renderedAt={renderedAt}
             photoUrl={photoOf(leg.owner)}
-            corner={roleCorner(roles, leg.owner.trim().toLowerCase())}
+            marks={marksOf(allMarks, leg.owner.trim().toLowerCase())}
           />
         ))}
       </ul>

@@ -4,7 +4,7 @@ import { connection } from "next/server";
 import { Avatar } from "@/components/avatar";
 import { PickAction } from "@/components/header-action";
 import { getPastWeeks } from "@/lib/live/board";
-import { getRoster, getWeekRoles, roleCorner } from "@/lib/live/players";
+import { getAvatarMarks, getRoster, marksOf, type Marks } from "@/lib/live/players";
 import { formatRecord } from "@/lib/players";
 import { badges as streakBadges, BADGE_EMOJI, extremes, standings, type Badge, type Standing } from "@/lib/stats";
 
@@ -23,14 +23,14 @@ function PickerCard({
   rows,
   photos,
   badges,
-  roles,
+  marks,
 }: {
   title: string;
   tone: string;
   rows: Standing[];
   photos: Map<string, string | null>;
   badges: Map<string, Badge>;
-  roles: Map<string, "high" | "low">;
+  marks: Map<string, Marks>;
 }) {
   return (
     <section className="card flex flex-col gap-2">
@@ -45,7 +45,7 @@ function PickerCard({
               photoUrl={photos.get(r.slug) ?? null}
               className="size-12 text-lg"
               badge={badgeOf(badges, r.slug)}
-              corner={roleCorner(roles, r.slug)}
+              {...marksOf(marks, r.slug)}
             />
             <div className="min-w-0">
               <p className="truncate font-bold">{r.name}</p>
@@ -62,7 +62,7 @@ function PickerCard({
 
 export default async function Home() {
   await connection();
-  const [weeks, roster, roles] = await Promise.all([getPastWeeks(), getRoster(), getWeekRoles()]);
+  const [weeks, roster, marks] = await Promise.all([getPastWeeks(), getRoster(), getAvatarMarks()]);
   const photos = new Map(roster.map((p) => [p.slug, p.photoUrl]));
 
   const results = weeks.map((w) => ({ weekNumber: w.weekNumber, legs: w.legs }));
@@ -85,8 +85,8 @@ export default async function Home() {
       </header>
 
       <div className="grid grid-cols-2 gap-3">
-        <PickerCard title="🦈 Sharks" tone="!text-emerald-400" rows={best} photos={photos} badges={badges} roles={roles} />
-        <PickerCard title="💩 Shitters" tone="!text-red-400" rows={worst} photos={photos} badges={badges} roles={roles} />
+        <PickerCard title="🦈 Sharks" tone="!text-emerald-400" rows={best} photos={photos} badges={badges} marks={marks} />
+        <PickerCard title="💩 Shitters" tone="!text-red-400" rows={worst} photos={photos} badges={badges} marks={marks} />
       </div>
 
       <section className="card">
@@ -101,7 +101,7 @@ export default async function Home() {
                   photoUrl={photos.get(r.slug) ?? null}
                   className="size-9 text-sm"
                   badge={badgeOf(badges, r.slug)}
-                  corner={roleCorner(roles, r.slug)}
+                  {...marksOf(marks, r.slug)}
                 />
                 <span className="min-w-0 flex-1 truncate font-semibold">{r.name}</span>
                 <span className="text-sm text-zinc-400">{formatRecord(r.record)}</span>
