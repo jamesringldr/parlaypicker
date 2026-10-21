@@ -30,6 +30,7 @@ function readSpec(formData: FormData): PickSpec | null {
       gameId: text("gameId"),
       kind: kind as "moneyline" | "spread" | "total",
       side: side as "home" | "away" | "over" | "under",
+      point: null,
       away,
       home,
     };

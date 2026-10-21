@@ -14,6 +14,8 @@ export type PickSpec =
       gameId: string;
       kind: "moneyline" | "spread" | "total";
       side: "home" | "away" | "over" | "under";
+      // The spread or total line, when the page knows it. Only used to spot contradictions.
+      point: number | null;
       away: string;
       home: string;
     }
@@ -138,7 +140,47 @@ export function legFromProp(
   };
 }
 
-// Whether `taken` (other players' conflict keys, with who holds each) blocks this pick.
-export function blockedBy(taken: Map<string, string>, spec: PickSpec): string | null {
-  return taken.get(conflictKeyOf(spec)) ?? null;
+// What a pick says about its game, for checking one pick against another.
+export interface Facts {
+  game: string;
+  kind: "moneyline" | "spread" | "total" | "prop";
+  side?: string;
+  point: number | null;
+}
+
+export const factsOfSpec = (spec: PickSpec): Facts =>
+  spec.src === "game"
+    ? { game: gameKey(spec.away, spec.home), kind: spec.kind, side: spec.side, point: spec.point }
+    : { game: gameKey(spec.away, spec.home), kind: "prop", point: spec.point };
+
+export const factsOfLeg = (leg: Leg): Facts => ({
+  game: gameKey(leg.awayTeam ?? "", leg.homeTeam ?? ""),
+  kind: leg.kind,
+  side: leg.side,
+  point: leg.point ?? null,
+});
+
+// A favorite's spread and the other team's moneyline can't both win: Bears -3 needs the Bears to win, so
+// Pats ML loses. An underdog's spread doesn't clash (Pats +3 and Bears ML can both hit).
+export function contradicts(a: Facts, b: Facts): boolean {
+  if (a.game !== b.game) return false;
+  const spread = a.kind === "spread" && b.kind === "moneyline" ? a : a.kind === "moneyline" && b.kind === "spread" ? b : null;
+  const ml = spread === a ? b : a;
+  return !!spread && spread.side !== ml.side && spread.point !== null && spread.point <= 0;
+}
+
+export interface OtherPick {
+  name: string;
+  conflictKey: string;
+  facts: Facts;
+}
+
+// Another player's pick that rules this one out, if any: the same bet or its other side, or a contradiction.
+export function blockedBy(others: OtherPick[], spec: PickSpec): { name: string; contradiction: boolean } | null {
+  const key = conflictKeyOf(spec);
+  const same = others.find((o) => o.conflictKey === key);
+  if (same) return { name: same.name, contradiction: false };
+  const facts = factsOfSpec(spec);
+  const clash = others.find((o) => contradicts(o.facts, facts));
+  return clash ? { name: clash.name, contradiction: true } : null;
 }

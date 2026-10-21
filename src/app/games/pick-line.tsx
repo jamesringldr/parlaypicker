@@ -1,4 +1,4 @@
-import { conflictKeyOf, lineIdOf, type PickSpec } from "@/lib/slip/legs";
+import { blockedBy, conflictKeyOf, lineIdOf, type PickSpec } from "@/lib/slip/legs";
 import { getSlipView } from "@/lib/slip/store";
 import { PickButton, type PickState } from "./pick-button";
 import { Line } from "./shared";
@@ -22,10 +22,10 @@ export async function PickLine({
   if (!view.me) return <Line top={top} bottom={bottom} className={className} />;
 
   const conflict = conflictKeyOf(spec);
-  const takenBy = view.taken.get(conflict);
+  const blocker = blockedBy(view.others, spec);
   // A player's own pick lights up on the exact line; the other side of it just stays tappable.
   const mine = view.mine?.conflictKey === conflict && view.mine.lineId === lineIdOf(spec);
-  const state: PickState = mine ? "mine" : !view.open ? "locked" : takenBy ? "taken" : "open";
+  const state: PickState = mine ? "mine" : !view.open ? "locked" : blocker ? "taken" : "open";
 
   const fields: Record<string, string> =
     spec.src === "game"
@@ -42,7 +42,11 @@ export async function PickLine({
         };
 
   const title =
-    state === "taken" ? `${takenBy} has this bet, or the other side of it` : state === "mine" ? "Your pick. Tap to take it back" : undefined;
+    state === "taken"
+      ? blocker?.contradiction
+        ? `Can't win alongside ${blocker.name}'s pick`
+        : `${blocker?.name} has this bet, or the other side of it`
+      : state === "mine" ? "Your pick. Tap to take it back" : undefined;
 
   return (
     <PickButton fields={fields} state={state} title={title} className={className}>
