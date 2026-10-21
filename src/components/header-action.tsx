@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { LIVE_PATH } from "@/lib/live/board";
-import { getRoster } from "@/lib/live/players";
+import { getRoster, getWeekRoles, roleCorner } from "@/lib/live/players";
 import { formatPrice } from "@/lib/rules";
 import { currentWeek, getPicks, getSlipView } from "@/lib/slip/store";
 import { PicksDialog, type PickRow } from "./picks-dialog";
@@ -35,7 +35,7 @@ export async function BoardAction() {
     );
   }
 
-  const [picks, roster] = await Promise.all([currentWeek().then(getPicks), getRoster()]);
+  const [picks, roster, roles] = await Promise.all([currentWeek().then(getPicks), getRoster(), getWeekRoles()]);
   const rows: PickRow[] = roster.flatMap((p) => {
     const leg = picks.find((x) => x.slug === p.slug)?.leg;
     return leg
@@ -44,6 +44,7 @@ export async function BoardAction() {
             slug: p.slug,
             name: p.name,
             photoUrl: p.photoUrl,
+            corner: roleCorner(roles, p.slug),
             label: leg.label,
             detail: leg.matchup ?? leg.market,
             price: leg.price === undefined ? undefined : formatPrice(leg.price),

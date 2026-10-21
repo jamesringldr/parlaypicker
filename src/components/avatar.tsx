@@ -3,6 +3,7 @@ export function Avatar({
   photoUrl,
   className = "size-20 text-3xl",
   badge,
+  corner,
   badgeClass = "text-sm",
 }: {
   name: string;
@@ -10,6 +11,8 @@ export function Avatar({
   className?: string;
   // An emoji pinned to the top-right corner.
   badge?: string;
+  // An emoji pinned to the top-left corner.
+  corner?: string;
   badgeClass?: string;
 }) {
   return (
@@ -22,6 +25,11 @@ export function Avatar({
           className={`${className} flex items-center justify-center rounded-full bg-zinc-800 font-bold text-zinc-300 ring-2 ring-zinc-700`}
         >
           {name[0]}
+        </span>
+      )}
+      {corner && (
+        <span className={`absolute -left-1.5 -top-1.5 leading-none drop-shadow ${badgeClass}`} aria-hidden>
+          {corner}
         </span>
       )}
       {badge && (

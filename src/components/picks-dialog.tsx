@@ -8,6 +8,8 @@ export interface PickRow {
   slug: string;
   name: string;
   photoUrl: string | null;
+  // The week's high or low scorer emoji, if they are one.
+  corner?: string;
   label: string;
   detail?: string;
   price?: string;
@@ -58,7 +60,7 @@ export function PicksDialog({ rows, total }: { rows: PickRow[]; total: number })
               <ul className="mt-3 overflow-y-auto">
                 {rows.map((r) => (
                   <li key={r.slug} className="flex items-center gap-3 border-b border-zinc-800 py-3 last:border-b-0">
-                    <Avatar name={r.name} photoUrl={r.photoUrl} className="size-10 text-base" />
+                    <Avatar name={r.name} photoUrl={r.photoUrl} className="size-10 text-base" corner={r.corner} />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-bold">{r.name}</p>
                       <p className="truncate text-sm text-zinc-200">

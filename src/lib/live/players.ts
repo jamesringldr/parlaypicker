@@ -1,7 +1,8 @@
 import "server-only";
+import { cache } from "react";
 import { createAdminClient } from "@/lib/supabase/server";
 import { PLAYERS, playerBySlug, sameOwner, tally, type Tally } from "@/lib/players";
-import { badges, type Badge } from "@/lib/stats";
+import { badges, ROLE_EMOJI, type Badge } from "@/lib/stats";
 import { getBoard, getPastWeeks, type ArchivedLeg } from "./board";
 import { gradeLeg, legKey, legScore, type Grade, type Leg } from "./grade";
 import { getScores } from "./scores";
@@ -64,6 +65,23 @@ export async function getPlayerProfile(slug: string): Promise<PlayerProfile | nu
     current: { weekNumber: currentWeek, role: roleOf.get(currentWeek) ?? null, legs },
   };
 }
+
+// Who was the high and low scorer in the latest week that has them recorded, by slug. Stays until the next
+// week's are entered, so it doesn't clear when the board is archived.
+export const getWeekRoles = cache(async (): Promise<Map<string, "high" | "low">> => {
+  const { data, error } = await createAdminClient().from("player_weeks").select("week_number, slug, role");
+  if (error) throw new Error(`Couldn't load the scorers: ${error.message}`);
+  const latest = Math.max(0, ...data.map((r) => r.week_number as number));
+  return new Map(
+    data.filter((r) => r.week_number === latest && (r.role === "high" || r.role === "low")).map((r) => [r.slug as string, r.role as "high" | "low"]),
+  );
+});
+
+// An emoji for the corner of a player's avatar, if they're the week's high or low scorer.
+export const roleCorner = (roles: Map<string, "high" | "low">, slug: string) => {
+  const role = roles.get(slug);
+  return role ? ROLE_EMOJI[role] : undefined;
+};
 
 export interface RosterEntry {
   name: string;

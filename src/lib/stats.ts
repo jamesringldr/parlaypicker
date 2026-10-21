@@ -38,6 +38,9 @@ export type Badge = "fire" | "ice";
 
 export const BADGE_EMOJI: Record<Badge, string> = { fire: "🔥", ice: "🧊" };
 
+// The latest week's fantasy high and low scorer, pinned to the top-left of their avatar.
+export const ROLE_EMOJI: Record<"high" | "low", string> = { high: "👑", low: "🤡" };
+
 const STREAK = 3;
 
 // Fire for a current run of 3 hits, ice for 3 misses. Pushes neither extend nor break a run.
