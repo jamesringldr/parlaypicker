@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findGameProps, isPullTime, playerIndex, searchPlayers, shortName, toGameProps, topProps, type GameProps } from "./props";
+import { findGameProps, isPullTime, isTuesday, playerIndex, searchPlayers, shortName, toGameProps, topProps, type GameProps } from "./props";
 import type { EventOdds } from "./types";
 
 const event = (markets: EventOdds["markets"]): EventOdds => ({
@@ -69,6 +69,14 @@ describe("isPullTime", () => {
     expect(isPullTime(Date.parse("2026-10-19T17:30:00Z"))).toBe(false); // Mon
     expect(isPullTime(Date.parse("2026-10-23T17:30:00Z"))).toBe(false); // Fri
     expect(isPullTime(Date.parse("2026-10-18T17:30:00Z"))).toBe(false); // Sun
+  });
+});
+
+describe("isTuesday", () => {
+  it("goes by Central time", () => {
+    expect(isTuesday(Date.parse("2026-10-20T17:30:00Z"))).toBe(true); // Tue noon CDT
+    expect(isTuesday(Date.parse("2026-10-21T03:00:00Z"))).toBe(true); // Tue 10pm CDT, already Wed in UTC
+    expect(isTuesday(Date.parse("2026-10-21T17:30:00Z"))).toBe(false); // Wed
   });
 });
 

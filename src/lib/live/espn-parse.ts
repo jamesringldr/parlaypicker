@@ -21,6 +21,12 @@ const num = (v: unknown): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
+// ESPN's scoreboard takes one day at a time ("20261018"), by Eastern date. Without a date it shows the
+// current week, which leaves a finished week's games off the board by Tuesday.
+export function espnDate(iso: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date(iso)).replaceAll("-", "");
+}
+
 const QUARTER_SECONDS = 15 * 60;
 
 // How much of regulation is gone, 0 to 1, from the quarter and the clock ("7:58" left in the
