@@ -24,12 +24,13 @@ import { kickoffShort, Line, signed } from "./shared";
 export const metadata: Metadata = { title: "Games | Low-T Parlay", robots: { index: false, follow: false } };
 
 // Each price box is a pick button; the spec says which bet it is.
-const spec = (game: GameCard, slate: string, kind: "moneyline" | "spread" | "total", side: "home" | "away" | "over" | "under"): PickSpec => ({
+const spec = (game: GameCard, slate: string, kind: "moneyline" | "spread" | "total", side: "home" | "away" | "over" | "under", point: number | null): PickSpec => ({
   src: "game",
   slate,
   gameId: game.id,
   kind,
   side,
+  point,
   away: game.away.name,
   home: game.home.name,
 });
@@ -37,7 +38,7 @@ const spec = (game: GameCard, slate: string, kind: "moneyline" | "spread" | "tot
 function Spread({ game, slate, which }: { game: GameCard; slate: string; which: "away" | "home" }) {
   const p = game.lines?.spread[which];
   if (!p || p.line === null) return <Line top="-" bottom="" />;
-  return <PickLine spec={spec(game, slate, "spread", which)} top={signed(p.line)} bottom={formatPrice(p.odds)} />;
+  return <PickLine spec={spec(game, slate, "spread", which, p.line)} top={signed(p.line)} bottom={formatPrice(p.odds)} />;
 }
 
 // The away row carries the over and the home row the under.
@@ -45,13 +46,13 @@ function Total({ game, slate, which }: { game: GameCard; slate: string; which: "
   const over = which === "away";
   const p = over ? game.lines?.total.over : game.lines?.total.under;
   if (!p || p.line === null) return <Line top="-" bottom="" />;
-  return <PickLine spec={spec(game, slate, "total", over ? "over" : "under")} top={`${over ? "o" : "u"}${p.line}`} bottom={formatPrice(p.odds)} />;
+  return <PickLine spec={spec(game, slate, "total", over ? "over" : "under", p.line)} top={`${over ? "o" : "u"}${p.line}`} bottom={formatPrice(p.odds)} />;
 }
 
 function Moneyline({ game, slate, which }: { game: GameCard; slate: string; which: "away" | "home" }) {
   const odds = game.lines?.moneyline[which] ?? null;
   if (odds === null) return <Line top="-" bottom="" />;
-  return <PickLine spec={spec(game, slate, "moneyline", which)} top={formatPrice(odds)} bottom="ML" />;
+  return <PickLine spec={spec(game, slate, "moneyline", which, null)} top={formatPrice(odds)} bottom="ML" />;
 }
 
 function TeamRow({ side, game, which, slate }: { side: Side; game: GameCard; which: "away" | "home"; slate: string }) {

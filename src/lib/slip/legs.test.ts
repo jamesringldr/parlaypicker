@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { GameCard } from "../games/espn-games";
 import type { GameProps, PlayerProp } from "../odds/props";
-import { blockedBy, conflictKeyOf, legFromGame, legFromProp, lineIdOf, lineIdOfLeg, type PickSpec } from "./legs";
+import { blockedBy, conflictKeyOf, factsOfLeg, factsOfSpec, legFromGame, legFromProp, lineIdOf, lineIdOfLeg, type PickSpec } from "./legs";
 
 const NOW = Date.parse("2026-10-18T12:00:00Z");
 const side = (name: string) => ({ abbr: "X", name, record: null, rank: null, logo: "", score: null });
@@ -21,12 +21,13 @@ const game: GameCard = {
     open: { total: null, favorite: null, spread: null },
   },
 };
-const g = (kind: "moneyline" | "spread" | "total", s: "home" | "away" | "over" | "under"): Extract<PickSpec, { src: "game" }> => ({
+const g = (kind: "moneyline" | "spread" | "total", s: "home" | "away" | "over" | "under", point: number | null = null): Extract<PickSpec, { src: "game" }> => ({
   src: "game",
   slate: "nfl",
   gameId: "401",
   kind,
   side: s,
+  point,
   away: "Buffalo Bills",
   home: "Kansas City Chiefs",
 });
@@ -66,10 +67,28 @@ describe("lineIdOfLeg", () => {
 });
 
 describe("blockedBy", () => {
-  it("names who holds the conflicting pick", () => {
-    const taken = new Map([[conflictKeyOf(g("spread", "home")), "Joe"]]);
-    expect(blockedBy(taken, g("spread", "away"))).toBe("Joe");
-    expect(blockedBy(taken, g("total", "over"))).toBeNull();
+  const pick = (spec: PickSpec, name = "Joe") => ({ name, conflictKey: conflictKeyOf(spec), facts: factsOfSpec(spec) });
+
+  it("names who holds the same bet or its other side", () => {
+    const others = [pick(g("spread", "home", -3.5))];
+    expect(blockedBy(others, g("spread", "away", 3.5))).toEqual({ name: "Joe", contradiction: false });
+    expect(blockedBy(others, g("total", "over", 47.5))).toBeNull();
+  });
+  it("blocks the other team's moneyline against a favorite's spread, both ways round", () => {
+    expect(blockedBy([pick(g("spread", "home", -3.5))], g("moneyline", "away"))).toEqual({ name: "Joe", contradiction: true });
+    expect(blockedBy([pick(g("moneyline", "away"))], g("spread", "home", -3.5))).toEqual({ name: "Joe", contradiction: true });
+  });
+  it("leaves the same team's moneyline and an underdog's spread alone", () => {
+    expect(blockedBy([pick(g("spread", "home", -3.5))], g("moneyline", "home"))).toBeNull();
+    expect(blockedBy([pick(g("spread", "away", 3.5))], g("moneyline", "home"))).toBeNull();
+    expect(blockedBy([pick(g("moneyline", "home"))], g("spread", "away", 3.5))).toBeNull();
+  });
+  it("reads the same facts off a saved leg", () => {
+    const leg = legFromGame(g("spread", "home", -3.5), game, "nfl", "Joe", NOW)!;
+    expect(blockedBy([{ name: "Joe", conflictKey: conflictKeyOf(g("spread", "home")), facts: factsOfLeg(leg) }], g("moneyline", "away"))).toEqual({
+      name: "Joe",
+      contradiction: true,
+    });
   });
 });
 

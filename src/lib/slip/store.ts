@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { getBoard, getPastWeeks, saveLegs } from "@/lib/live/board";
 import { getRole, type Role } from "@/lib/live/activity-store";
 import type { Leg } from "@/lib/live/grade";
-import { lineIdOfLeg } from "./legs";
+import { contradicts, factsOfLeg, lineIdOfLeg, type OtherPick } from "./legs";
 import { playerBySlug } from "@/lib/players";
 import { readSession, SESSION_COOKIE } from "@/lib/session";
 import { createAdminClient } from "@/lib/supabase/server";
@@ -47,6 +47,9 @@ export async function savePick(week: number, slug: string, leg: Leg, conflictKey
   const picks = await getPicks(week);
   const clash = picks.find((p) => p.slug !== slug && p.conflictKey === conflictKey);
   if (clash) return `${playerBySlug(clash.slug)?.name ?? "Someone"} already has that bet, or the other side of it.`;
+
+  const contradiction = picks.find((p) => p.slug !== slug && contradicts(factsOfLeg(p.leg), factsOfLeg(leg)));
+  if (contradiction) return `${playerBySlug(contradiction.slug)?.name ?? "Someone"}'s pick (${contradiction.leg.label}) rules that one out.`;
 
   const mine = picks.find((p) => p.slug === slug);
   if (mine && startedAlready(mine.leg)) return "Your current pick's game has started, so it can't be changed.";
@@ -112,8 +115,8 @@ export interface SlipView {
   open: boolean;
   // The signed-in player's pick.
   mine: { conflictKey: string; lineId: string } | null;
-  // Other players' conflict keys, with whose they are.
-  taken: Map<string, string>;
+  // Everyone else's picks.
+  others: OtherPick[];
 }
 
 // What the Games tab needs to mark each line, loaded once per request.
@@ -126,8 +129,8 @@ export const getSlipView = cache(async (): Promise<SlipView> => {
     me: viewer?.slug ?? null,
     open,
     mine: mine ? { conflictKey: mine.conflictKey, lineId: lineIdOfLeg(mine.leg, mine.conflictKey) } : null,
-    taken: new Map(
-      picks.filter((p) => p.slug !== viewer?.slug).map((p) => [p.conflictKey, playerBySlug(p.slug)?.name ?? "Someone"]),
-    ),
+    others: picks
+      .filter((p) => p.slug !== viewer?.slug)
+      .map((p) => ({ name: playerBySlug(p.slug)?.name ?? "Someone", conflictKey: p.conflictKey, facts: factsOfLeg(p.leg) })),
   };
 });
