@@ -222,7 +222,7 @@ export default async function Games(props: PageProps<"/games">) {
       <AutoRefresh />
 
       <header className="flex items-center justify-between gap-3">
-        <h1 className="text-xl font-bold tracking-tight">This Week&apos;s Board</h1>
+        <h1 className="text-xl font-bold tracking-tight">This Week&apos;s Lines</h1>
         <BoardAction />
       </header>
 
