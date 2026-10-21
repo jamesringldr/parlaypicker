@@ -6,6 +6,7 @@ import { connection } from "next/server";
 import { Avatar } from "@/components/avatar";
 import { timeAgo } from "@/lib/activity";
 import { getActivity, getRole } from "@/lib/live/activity-store";
+import { getWeekRoles, roleCorner } from "@/lib/live/players";
 import { readSession, SESSION_COOKIE } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Activity | Low-T Parlay", robots: { index: false, follow: false } };
@@ -25,7 +26,7 @@ export default async function Activity() {
   const me = readSession((await cookies()).get(SESSION_COOKIE)?.value);
   if ((await getRole(me)) !== "super_admin") notFound();
 
-  const { rows, at: now } = await getActivity();
+  const [{ rows, at: now }, roles] = await Promise.all([getActivity(), getWeekRoles()]);
   const seen = rows.filter((r) => r.lastSeenAt).length;
 
   return (
@@ -45,7 +46,7 @@ export default async function Activity() {
       <ul className="card !p-0">
         {rows.map((r) => (
           <li key={r.slug} className="flex items-center gap-3 border-b border-zinc-800 px-4 py-3 last:border-b-0">
-            <Avatar name={r.name} photoUrl={r.photoUrl} className="size-10 text-base" />
+            <Avatar name={r.name} photoUrl={r.photoUrl} className="size-10 text-base" corner={roleCorner(roles, r.slug)} />
             <div className="min-w-0 flex-1">
               <p className="truncate font-bold">{r.name}</p>
               {r.lastSeenAt ? (
