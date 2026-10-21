@@ -2,7 +2,7 @@ import "server-only";
 import { cached, oddsGet } from "@/lib/odds/the-odds-api";
 import { SPORTS, type Sport } from "@/lib/odds/types";
 import { getEspnScoreboard, getEspnSummary } from "./espn";
-import type { EspnGame } from "./espn-parse";
+import { espnDate, type EspnGame } from "./espn-parse";
 import { legKey, normName, type BoxScore, type GameScore, type Leg } from "./grade";
 
 // Backup source. The scores endpoint costs 2 credits per call (the daysFrom form), so every
@@ -66,7 +66,8 @@ export async function getScores(legs: Leg[]): Promise<LiveData> {
   await Promise.all(
     sportsStarted.map(async (sport) => {
       try {
-        games.set(sport, await getEspnScoreboard(sport));
+        const days = [...new Set(started.filter((l) => l.sport === sport).map((l) => espnDate(l.commenceTime!)))];
+        games.set(sport, await getEspnScoreboard(sport, days));
       } catch {
         // Fall through to the backup source below.
       }

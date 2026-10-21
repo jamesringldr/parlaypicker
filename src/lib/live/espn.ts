@@ -26,8 +26,20 @@ async function espnGet(path: string): Promise<unknown> {
   return response.json();
 }
 
-export function getEspnScoreboard(sport: Sport): Promise<EspnGame[]> {
-  return cached(`espn:scoreboard:${sport}`, TTL_MS, async () => parseScoreboard(await espnGet(SCOREBOARD_PATH[sport])));
+// Today's board, or the given days' (`espnDate` format). A week's legs need the days they were played on.
+export async function getEspnScoreboard(sport: Sport, dates?: string[]): Promise<EspnGame[]> {
+  const days = dates && dates.length > 0 ? dates : [undefined];
+  const lists = await Promise.all(
+    days.map((date) =>
+      cached(`espn:scoreboard:${sport}:${date ?? "now"}`, TTL_MS, async () => {
+        const base = SCOREBOARD_PATH[sport];
+        const path = date ? `${base}${base.includes("?") ? "&" : "?"}dates=${date}` : base;
+        return parseScoreboard(await espnGet(path));
+      }),
+    ),
+  );
+  const byId = new Map(lists.flat().map((g) => [g.id, g]));
+  return [...byId.values()];
 }
 
 export interface EspnSummary {

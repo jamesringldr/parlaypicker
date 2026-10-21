@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { elapsedShare, gameClock, parseBox, parseLastScoringPlay, parseScoreboard } from "./espn-parse";
+import { elapsedShare, espnDate, gameClock, parseBox, parseLastScoringPlay, parseScoreboard } from "./espn-parse";
 
 const scoreboard = {
   events: [
@@ -172,5 +172,13 @@ describe("parseLastScoringPlay", () => {
     expect(parseLastScoringPlay({ scoringPlays: [] })).toBeNull();
     expect(parseLastScoringPlay({})).toBeNull();
     expect(parseLastScoringPlay(null)).toBeNull();
+  });
+});
+
+describe("espnDate", () => {
+  it("is the Eastern date, so a night game stays on its own day", () => {
+    expect(espnDate("2026-10-18T17:00:00Z")).toBe("20261018");
+    expect(espnDate("2026-10-20T00:15:00Z")).toBe("20261019"); // Mon 8:15pm ET
+    expect(espnDate("2026-10-18T03:30:00Z")).toBe("20261017");
   });
 });

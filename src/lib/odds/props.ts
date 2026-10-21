@@ -78,6 +78,11 @@ export function isPullTime(now: number): boolean {
   return ["Tue", "Wed", "Thu"].includes(get("weekday") ?? "") && get("hour") === "12";
 }
 
+// Whether it's Tuesday in Central time. The Tuesday pull also archives the finished week.
+export function isTuesday(now: number): boolean {
+  return new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "America/Chicago" }).format(new Date(now)) === "Tue";
+}
+
 // Lowercase, no accents, no punctuation inside a name ("D'Andre" -> "dandre"), hyphens as spaces.
 export const normalizeName = (s: string) =>
   s
