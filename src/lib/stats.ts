@@ -39,10 +39,8 @@ export type Badge = "fire" | "ice";
 export const BADGE_EMOJI: Record<Badge, string> = { fire: "🔥", ice: "🧊" };
 
 // The latest week's fantasy high and low scorer, pinned to the top-left of their avatar.
-// The best and worst pick of the previous week, pinned to the bottom-right.
+// The best and worst pick of the previous week, pinned to the top-left of the avatar.
 export const AWARD_EMOJI: Record<"best" | "worst", string> = { best: "🎯", worst: "🤮" };
-
-export const ROLE_EMOJI: Record<"high" | "low", string> = { high: "👑", low: "☠️" };
 
 const STREAK = 3;
 
