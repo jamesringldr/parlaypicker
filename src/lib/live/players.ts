@@ -66,20 +66,33 @@ export async function getPlayerProfile(slug: string): Promise<PlayerProfile | nu
   };
 }
 
-// The emoji on a player's avatar: the best or worst pick of the latest week that has them recorded. It stays until
-// the next week's are entered, so it doesn't clear when the board is archived.
+// The best and worst pick of the latest week that has them recorded, by slug. They stay until the next week's are
+// entered, so they don't clear when the board is archived.
+export interface PickAwards {
+  weekNumber: number;
+  best: string[];
+  worst: string[];
+}
+
+export const getPickAwards = cache(async (): Promise<PickAwards | null> => {
+  const { data, error } = await createAdminClient().from("pick_awards").select("week_number, slug, kind");
+  if (error) throw new Error(`Couldn't load the pick awards: ${error.message}`);
+  if (data.length === 0) return null;
+
+  const weekNumber = Math.max(...data.map((r) => r.week_number as number));
+  const slugs = (kind: string) => data.filter((r) => r.week_number === weekNumber && r.kind === kind).map((r) => r.slug as string);
+  return { weekNumber, best: slugs("best"), worst: slugs("worst") };
+});
+
+// The emoji on a player's avatar: a bullseye for the best pick, a puke face for the worst.
 export type Marks = { corner?: string };
 
 export const getAvatarMarks = cache(async (): Promise<Map<string, Marks>> => {
-  const { data, error } = await createAdminClient().from("pick_awards").select("week_number, slug, kind");
-  if (error) throw new Error(`Couldn't load the pick awards: ${error.message}`);
-
-  const latest = Math.max(0, ...data.map((r) => r.week_number as number));
-  return new Map(
-    data
-      .filter((r) => r.week_number === latest && (r.kind === "best" || r.kind === "worst"))
-      .map((r) => [r.slug as string, { corner: AWARD_EMOJI[r.kind as "best" | "worst"] }]),
-  );
+  const awards = await getPickAwards();
+  return new Map([
+    ...(awards?.best ?? []).map((slug): [string, Marks] => [slug, { corner: AWARD_EMOJI.best }]),
+    ...(awards?.worst ?? []).map((slug): [string, Marks] => [slug, { corner: AWARD_EMOJI.worst }]),
+  ]);
 });
 
 export const marksOf = (marks: Map<string, Marks>, slug: string): Marks => marks.get(slug) ?? {};
