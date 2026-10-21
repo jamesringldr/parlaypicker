@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AppBar } from "@/components/app-bar";
+import { PickReminder } from "@/components/pick-reminder";
 import { playerBySlug } from "@/lib/players";
+import { getPickReminder } from "@/lib/slip/store";
 import { readSession, SESSION_COOKIE } from "@/lib/session";
 import "./globals.css";
 
@@ -24,6 +26,7 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const session = readSession((await cookies()).get(SESSION_COOKIE)?.value);
   const me = session && playerBySlug(session) ? session : null;
+  const reminder = me ? await getPickReminder() : null;
 
   return (
     <html
@@ -32,7 +35,8 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col pb-20 font-sans">
         {children}
-        <AppBar me={me} />
+        <AppBar me={me} missingPick={!!reminder} />
+        {reminder && <PickReminder deadline={reminder.deadline} serverNow={reminder.now} />}
       </body>
     </html>
   );

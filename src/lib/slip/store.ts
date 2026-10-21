@@ -1,9 +1,10 @@
 import "server-only";
 import { cache } from "react";
 import { cookies } from "next/headers";
-import { getBoard, getPastWeeks, saveLegs } from "@/lib/live/board";
+import { getBoard, saveLegs } from "@/lib/live/board";
 import { getRole, type Role } from "@/lib/live/activity-store";
 import type { Leg } from "@/lib/live/grade";
+import { pickDeadline } from "./deadline";
 import { contradicts, factsOfLeg, lineIdOfLeg, type OtherPick } from "./legs";
 import { playerBySlug } from "@/lib/players";
 import { readSession, SESSION_COOKIE } from "@/lib/session";
@@ -17,7 +18,14 @@ export interface SlipPick {
 
 // The board's week is the one after the last archived week.
 export async function currentWeek(): Promise<number> {
-  return Math.max(0, ...(await getPastWeeks()).map((w) => w.weekNumber)) + 1;
+  const { data, error } = await createAdminClient()
+    .from("live_board_weeks")
+    .select("week_number")
+    .order("week_number", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(`Couldn't load the week: ${error.message}`);
+  return (data?.week_number ?? 0) + 1;
 }
 
 // Picks are open until an admin finalizes the slip. A week whose legs were typed straight onto the
@@ -134,3 +142,15 @@ export const getSlipView = cache(async (): Promise<SlipView> => {
       .map((p) => ({ name: playerBySlug(p.slug)?.name ?? "Someone", conflictKey: p.conflictKey, facts: factsOfLeg(p.leg) })),
   };
 });
+
+// Set when the signed-in player has no pick yet and picks are still open. Never throws: this runs on every page.
+export async function getPickReminder(): Promise<{ deadline: number; now: number } | null> {
+  try {
+    const view = await getSlipView();
+    if (!view.me || !view.open || view.mine) return null;
+    const now = Date.now();
+    return { deadline: pickDeadline(now), now };
+  } catch {
+    return null;
+  }
+}

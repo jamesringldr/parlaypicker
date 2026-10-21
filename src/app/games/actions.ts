@@ -63,8 +63,7 @@ export async function makePick(_previous: PickResult, formData: FormData): Promi
   if (formData.get("intent") === "remove") {
     const problem = await clearPick(week, viewer.slug);
     if (problem) return { error: problem };
-    revalidatePath("/games");
-    revalidatePath("/bet-slip");
+    revalidatePath("/", "layout");
     return {};
   }
 
@@ -97,7 +96,7 @@ export async function makePick(_previous: PickResult, formData: FormData): Promi
 
   const problem = await savePick(week, viewer.slug, leg, conflictKey);
   if (problem) return { error: problem };
-  revalidatePath("/games");
-  revalidatePath("/bet-slip");
+  // The layout carries the missing-pick badge, so it refreshes too.
+  revalidatePath("/", "layout");
   return {};
 }

@@ -21,7 +21,7 @@ import { ForecastIcon } from "./forecast-icon";
 import { PickLine } from "./pick-line";
 import { kickoffShort, Line, signed } from "./shared";
 
-export const metadata: Metadata = { title: "Games | Low-T Parlay", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: "Board | Low-T Parlay", robots: { index: false, follow: false } };
 
 // Each price box is a pick button; the spec says which bet it is.
 const spec = (game: GameCard, slate: string, kind: "moneyline" | "spread" | "total", side: "home" | "away" | "over" | "under", point: number | null): PickSpec => ({

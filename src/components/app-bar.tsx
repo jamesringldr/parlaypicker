@@ -5,13 +5,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 // `me` is the signed-in player's slug. Signed out, My Legs sends them to sign in.
-export function AppBar({ me }: { me: string | null }) {
+export function AppBar({ me, missingPick }: { me: string | null; missingPick: boolean }) {
   const pathname = usePathname();
   if (pathname.startsWith("/login")) return null;
 
   const tabs = [
     { label: "Home", href: "/", icon: House, active: pathname === "/" },
-    { label: "Games", href: "/games", icon: CalendarDays, active: pathname.startsWith("/games") },
+    { label: "Board", href: "/games", icon: CalendarDays, active: pathname.startsWith("/games"), badge: missingPick },
     { label: "Bet Slips", href: "/bet-slip", icon: Receipt, active: pathname.startsWith("/bet-slip") },
     { label: "My Legs", href: me ? `/${me}` : "/login", icon: UserRound, active: !!me && pathname === `/${me}` },
   ];
@@ -22,7 +22,7 @@ export function AppBar({ me }: { me: string | null }) {
       className="fixed inset-x-0 bottom-0 z-20 border-t border-zinc-800 bg-zinc-950/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
     >
       <ul className="mx-auto flex max-w-2xl">
-        {tabs.map(({ label, href, icon: Icon, active }) => (
+        {tabs.map(({ label, href, icon: Icon, active, badge }) => (
           <li key={label} className="flex-1">
             <Link
               href={href}
@@ -32,7 +32,16 @@ export function AppBar({ me }: { me: string | null }) {
               }`}
             >
               {/* Lucide has no solid icons, so the active one is filled and its inner lines are cut out in the bar colour. */}
-              <Icon className={`size-5 ${active ? "fill-current stroke-zinc-950" : ""}`} aria-hidden />
+              <span className="relative">
+                <Icon className={`size-5 ${active ? "fill-current stroke-zinc-950" : ""}`} aria-hidden />
+                {badge && (
+                  <span
+                    role="img"
+                    aria-label="Your pick is missing"
+                    className="absolute -right-1 -top-0.5 size-2.5 rounded-full border-2 border-zinc-950 bg-red-500 box-content"
+                  />
+                )}
+              </span>
               {label}
             </Link>
           </li>
