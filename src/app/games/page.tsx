@@ -13,6 +13,7 @@ import {
   type CollegeFilter,
   type Slate,
 } from "@/lib/games/scoreboard";
+import { formatMove, isMoveKind, spreadMove, totalMove, type MoveKind } from "@/lib/games/movement";
 import { findGameProps, isPropTab } from "@/lib/odds/props";
 import { getUpcomingProps, type UpcomingProps } from "@/lib/odds/props-store";
 import { formatPrice } from "@/lib/rules";
@@ -36,18 +37,37 @@ const spec = (game: GameCard, slate: string, kind: "moneyline" | "spread" | "tot
   home: game.home.name,
 });
 
-function Spread({ game, slate, which }: { game: GameCard; slate: string; which: "away" | "home" }) {
+// A price box with how far its line has moved since open under it, when that bet type is selected.
+function WithMove({ delta, children }: { delta: number | null; children: React.ReactNode }) {
+  if (delta === null) return children;
+  return (
+    <div className="flex shrink-0 flex-col items-center gap-0.5">
+      {children}
+      <span className="text-[10px] font-semibold leading-none tabular-nums text-blue-400">{formatMove(delta)}</span>
+    </div>
+  );
+}
+
+function Spread({ game, slate, which, move }: { game: GameCard; slate: string; which: "away" | "home"; move: MoveKind | null }) {
   const p = game.lines?.spread[which];
   if (!p || p.line === null) return <Line top="-" bottom="" />;
-  return <PickLine spec={spec(game, slate, "spread", which, p.line)} top={signed(p.line)} bottom={formatPrice(p.odds)} />;
+  return (
+    <WithMove delta={move === "spread" && game.lines ? spreadMove(game.lines, which) : null}>
+      <PickLine spec={spec(game, slate, "spread", which, p.line)} top={signed(p.line)} bottom={formatPrice(p.odds)} />
+    </WithMove>
+  );
 }
 
 // The away row carries the over and the home row the under.
-function Total({ game, slate, which }: { game: GameCard; slate: string; which: "away" | "home" }) {
+function Total({ game, slate, which, move }: { game: GameCard; slate: string; which: "away" | "home"; move: MoveKind | null }) {
   const over = which === "away";
   const p = over ? game.lines?.total.over : game.lines?.total.under;
   if (!p || p.line === null) return <Line top="-" bottom="" />;
-  return <PickLine spec={spec(game, slate, "total", over ? "over" : "under", p.line)} top={`${over ? "o" : "u"}${p.line}`} bottom={formatPrice(p.odds)} />;
+  return (
+    <WithMove delta={move === "total" && game.lines ? totalMove(game.lines) : null}>
+      <PickLine spec={spec(game, slate, "total", over ? "over" : "under", p.line)} top={`${over ? "o" : "u"}${p.line}`} bottom={formatPrice(p.odds)} />
+    </WithMove>
+  );
 }
 
 function Moneyline({ game, slate, which }: { game: GameCard; slate: string; which: "away" | "home" }) {
@@ -56,7 +76,7 @@ function Moneyline({ game, slate, which }: { game: GameCard; slate: string; whic
   return <PickLine spec={spec(game, slate, "moneyline", which, null)} top={formatPrice(odds)} bottom="ML" />;
 }
 
-function TeamRow({ side, game, which, slate }: { side: Side; game: GameCard; which: "away" | "home"; slate: string }) {
+function TeamRow({ side, game, which, slate, move }: { side: Side; game: GameCard; which: "away" | "home"; slate: string; move: MoveKind | null }) {
   const { lines, state } = game;
   const open = lines?.open;
   // Before kickoff the left column is where the lines opened: the favorite's spread on its row, the total on the other.
@@ -88,8 +108,8 @@ function TeamRow({ side, game, which, slate }: { side: Side; game: GameCard; whi
           <p className="hidden w-8 shrink-0 text-center text-sm text-zinc-400 min-[400px]:block sm:w-10">{openText}</p>
           {lines && (
             <div className="flex gap-1 sm:gap-1.5">
-              <Spread game={game} slate={slate} which={which} />
-              <Total game={game} slate={slate} which={which} />
+              <Spread game={game} slate={slate} which={which} move={move} />
+              <Total game={game} slate={slate} which={which} move={move} />
               <Moneyline game={game} slate={slate} which={which} />
             </div>
           )}
@@ -101,11 +121,11 @@ function TeamRow({ side, game, which, slate }: { side: Side; game: GameCard; whi
   );
 }
 
-function Card({ game, propsId, slate }: { game: GameCard; propsId?: string; slate: string }) {
+function Card({ game, propsId, slate, move }: { game: GameCard; propsId?: string; slate: string; move: MoveKind | null }) {
   return (
     <article className="flex flex-col gap-3 rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
-      <TeamRow side={game.away} game={game} which="away" slate={slate} />
-      <TeamRow side={game.home} game={game} which="home" slate={slate} />
+      <TeamRow side={game.away} game={game} which="away" slate={slate} move={move} />
+      <TeamRow side={game.home} game={game} which="home" slate={slate} move={move} />
       <div className="flex items-center justify-between gap-3">
         {game.state === "pre" ? (
           <p className="flex min-w-0 items-center gap-1.5 text-sm text-zinc-400">
@@ -131,17 +151,19 @@ function Card({ game, propsId, slate }: { game: GameCard; propsId?: string; slat
   );
 }
 
-function Section({ title, games, open, propsIds, slate }: { title: string; games: GameCard[]; open: boolean; propsIds: Map<string, string>; slate: string }) {
+function Section({ title, games, open, propsIds, slate, move, controls }: { title: string; games: GameCard[]; open: boolean; propsIds: Map<string, string>; slate: string; move: MoveKind | null; controls?: React.ReactNode }) {
   if (games.length === 0) return null;
   return (
     <details open={open} className="group">
-      <summary className="flex cursor-pointer list-none items-center justify-between py-2 [&::-webkit-details-marker]:hidden">
+      <summary className="flex cursor-pointer list-none items-center gap-3 py-2 [&::-webkit-details-marker]:hidden">
         <h2 className="text-xl font-bold tracking-tight">{title}</h2>
+        {/* Links inside a summary don't toggle the section. */}
+        <div className="ml-auto flex items-center gap-1.5">{controls}</div>
         <ChevronDown className="size-5 text-zinc-400 transition-transform group-open:rotate-180" aria-hidden />
       </summary>
       <div className="flex flex-col gap-3">
         {games.map((g) => (
-          <Card key={g.id} game={g} propsId={g.state === "pre" ? propsIds.get(g.id) : undefined} slate={slate} />
+          <Card key={g.id} game={g} propsId={g.state === "pre" ? propsIds.get(g.id) : undefined} slate={slate} move={move} />
         ))}
       </div>
     </details>
@@ -160,7 +182,7 @@ const FILTERS: { key: CollegeFilter; label: string }[] = [
 
 export default async function Games(props: PageProps<"/games">) {
   await connection();
-  const { sport, conf, tab, view, player, prop, cat, game: gameParam } = await props.searchParams;
+  const { sport, conf, tab, view, player, prop, cat, game: gameParam, move: moveParam } = await props.searchParams;
   const ncaa = sport === "ncaa";
   const onProps = !ncaa && tab === "props";
   const propsView = view === "games" ? "games" : "players";
@@ -206,6 +228,34 @@ export default async function Games(props: PageProps<"/games">) {
 
   // Which ESPN slate a pick came from, so the server can find the game again.
   const slate = ncaa ? filter : "nfl";
+  const move = isMoveKind(moveParam) ? moveParam : null;
+  // Tapping the selected button clears it, so only one is on at a time or neither.
+  const moveHref = (kind: MoveKind) => {
+    const q = new URLSearchParams();
+    if (ncaa) q.set("sport", "ncaa");
+    if (ncaa && filter !== "top25") q.set("conf", filter);
+    if (move !== kind) q.set("move", kind);
+    return q.size > 0 ? `/games?${q}` : "/games";
+  };
+  const moveControls = (
+    <>
+      <span className="text-xs font-semibold text-zinc-400">Line Movement:</span>
+      {(["spread", "total"] as const).map((kind) => (
+        <Link
+          key={kind}
+          href={moveHref(kind)}
+          replace
+          scroll={false}
+          aria-current={move === kind ? "true" : undefined}
+          className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+            move === kind ? "border-blue-600 bg-blue-600 text-white" : "border-zinc-600 text-zinc-300 hover:bg-zinc-800"
+          }`}
+        >
+          {kind === "spread" ? "Spread" : "Total"}
+        </Link>
+      ))}
+    </>
+  );
   const games = data?.games ?? [];
   const live = games.filter((g) => g.state === "in");
   const upcoming = games.filter((g) => g.state === "pre");
@@ -315,9 +365,9 @@ export default async function Games(props: PageProps<"/games">) {
         <p className="card text-sm text-zinc-400">{ncaa && filter === "top25" ? "No ranked teams play this week." : "No games this week."}</p>
       )}
 
-      <Section title="Live" slate={slate} games={live} open propsIds={propsIds} />
-      <Section title="Upcoming" slate={slate} games={upcoming} open propsIds={propsIds} />
-      <Section title="Final" slate={slate} games={final} open={live.length === 0 && upcoming.length === 0} propsIds={propsIds} />
+      <Section title="Live" slate={slate} move={move} games={live} open propsIds={propsIds} />
+      <Section title="Upcoming" slate={slate} move={move} controls={moveControls} games={upcoming} open propsIds={propsIds} />
+      <Section title="Final" slate={slate} move={move} games={final} open={live.length === 0 && upcoming.length === 0} propsIds={propsIds} />
       {games.some((g) => g.lines) && (
         <p className="text-center text-xs text-zinc-500">Lines from DraftKings via ESPN. FanDuel&apos;s can differ.</p>
       )}
