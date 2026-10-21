@@ -7,7 +7,7 @@ import { Avatar } from "@/components/avatar";
 import { PickAction } from "@/components/header-action";
 import { type ArchivedLeg } from "@/lib/live/board";
 import { getRole } from "@/lib/live/activity-store";
-import { getBadges, getPlayerProfile, getRoster, getWeekRoles, roleCorner } from "@/lib/live/players";
+import { getBadges, getPlayerProfile, getRoster, getAvatarMarks, marksOf } from "@/lib/live/players";
 import { formatRecord, hitRate, playerBySlug } from "@/lib/players";
 import { formatPrice } from "@/lib/rules";
 import { getPicks, isDrafting } from "@/lib/slip/store";
@@ -50,7 +50,7 @@ function LegLine({ leg }: { leg: ArchivedLeg }) {
 export default async function PlayerPage(props: PageProps<"/[player]">) {
   await connection();
   const { player: slug } = await props.params;
-  const [profile, roster, badges, roles] = await Promise.all([getPlayerProfile(slug), getRoster(), getBadges(), getWeekRoles()]);
+  const [profile, roster, badges, marks] = await Promise.all([getPlayerProfile(slug), getRoster(), getBadges(), getAvatarMarks()]);
   const emoji = (s: string) => (badges.has(s) ? BADGE_EMOJI[badges.get(s)!] : undefined);
   if (!profile) notFound();
   const others = roster.filter((p) => p.slug !== slug.toLowerCase());
@@ -91,7 +91,7 @@ export default async function PlayerPage(props: PageProps<"/[player]">) {
       </header>
 
       <section className="flex items-center gap-3">
-        <Avatar name={profile.name} photoUrl={profile.photoUrl} className="size-16 text-2xl" badge={emoji(slug.toLowerCase())} corner={roleCorner(roles, slug.toLowerCase())} badgeClass="text-xl" />
+        <Avatar name={profile.name} photoUrl={profile.photoUrl} className="size-16 text-2xl" badge={emoji(slug.toLowerCase())} {...marksOf(marks, slug.toLowerCase())} badgeClass="text-xl" />
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-xl font-bold tracking-tight">{profile.name}</h2>
           {profile.fantasyName && <p className="truncate text-sm text-zinc-400">{profile.fantasyName}</p>}
@@ -198,7 +198,7 @@ export default async function PlayerPage(props: PageProps<"/[player]">) {
             {others.map((p) => (
               <li key={p.slug} className="shrink-0 snap-start">
                 <Link href={`/${p.slug}`} className="flex w-20 flex-col items-center gap-1.5 hover:opacity-80">
-                  <Avatar name={p.name} photoUrl={p.photoUrl} className="size-14 text-xl" badge={emoji(p.slug)} corner={roleCorner(roles, p.slug)} badgeClass="text-lg" />
+                  <Avatar name={p.name} photoUrl={p.photoUrl} className="size-14 text-xl" badge={emoji(p.slug)} {...marksOf(marks, p.slug)} badgeClass="text-lg" />
                   <span className="w-full truncate text-center text-xs font-semibold text-zinc-300">{p.name}</span>
                 </Link>
               </li>

@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { createAdminClient } from "@/lib/supabase/server";
 import { PLAYERS, playerBySlug, sameOwner, tally, type Tally } from "@/lib/players";
-import { badges, ROLE_EMOJI, type Badge } from "@/lib/stats";
+import { AWARD_EMOJI, badges, ROLE_EMOJI, type Badge } from "@/lib/stats";
 import { getBoard, getPastWeeks, type ArchivedLeg } from "./board";
 import { gradeLeg, legKey, legScore, type Grade, type Leg } from "./grade";
 import { getScores } from "./scores";
@@ -66,22 +66,34 @@ export async function getPlayerProfile(slug: string): Promise<PlayerProfile | nu
   };
 }
 
-// Who was the high and low scorer in the latest week that has them recorded, by slug. Stays until the next
-// week's are entered, so it doesn't clear when the board is archived.
-export const getWeekRoles = cache(async (): Promise<Map<string, "high" | "low">> => {
-  const { data, error } = await createAdminClient().from("player_weeks").select("week_number, slug, role");
-  if (error) throw new Error(`Couldn't load the scorers: ${error.message}`);
-  const latest = Math.max(0, ...data.map((r) => r.week_number as number));
-  return new Map(
-    data.filter((r) => r.week_number === latest && (r.role === "high" || r.role === "low")).map((r) => [r.slug as string, r.role as "high" | "low"]),
-  );
+// The emojis on a player's avatar: the top-left one for the high or low scorer of the latest week that has them
+// recorded, and the bottom-right one for the best or worst pick of the latest week that has those. Both stay until
+// the next week's are entered, so they don't clear when the board is archived.
+export type Marks = { corner?: string; award?: string };
+
+export const getAvatarMarks = cache(async (): Promise<Map<string, Marks>> => {
+  const db = createAdminClient();
+  const [roles, awards] = await Promise.all([
+    db.from("player_weeks").select("week_number, slug, role"),
+    db.from("pick_awards").select("week_number, slug, kind"),
+  ]);
+  if (roles.error) throw new Error(`Couldn't load the scorers: ${roles.error.message}`);
+  if (awards.error) throw new Error(`Couldn't load the pick awards: ${awards.error.message}`);
+
+  const marks = new Map<string, Marks>();
+  const put = (slug: string, mark: Marks) => marks.set(slug, { ...marks.get(slug), ...mark });
+  const latestRole = Math.max(0, ...roles.data.map((r) => r.week_number as number));
+  for (const r of roles.data) {
+    if (r.week_number === latestRole && (r.role === "high" || r.role === "low")) put(r.slug as string, { corner: ROLE_EMOJI[r.role as "high" | "low"] });
+  }
+  const latestAward = Math.max(0, ...awards.data.map((r) => r.week_number as number));
+  for (const r of awards.data) {
+    if (r.week_number === latestAward && (r.kind === "best" || r.kind === "worst")) put(r.slug as string, { award: AWARD_EMOJI[r.kind as "best" | "worst"] });
+  }
+  return marks;
 });
 
-// An emoji for the corner of a player's avatar, if they're the week's high or low scorer.
-export const roleCorner = (roles: Map<string, "high" | "low">, slug: string) => {
-  const role = roles.get(slug);
-  return role ? ROLE_EMOJI[role] : undefined;
-};
+export const marksOf = (marks: Map<string, Marks>, slug: string): Marks => marks.get(slug) ?? {};
 
 export interface RosterEntry {
   name: string;

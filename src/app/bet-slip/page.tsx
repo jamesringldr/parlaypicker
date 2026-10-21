@@ -7,7 +7,7 @@ import { Avatar } from "@/components/avatar";
 import { ErrorBanner } from "@/components/error-banner";
 import type { SlipStatus } from "@/lib/betslip";
 import { getBetSlip, type Scorer } from "@/lib/live/betslip";
-import { getWeekRoles, roleCorner } from "@/lib/live/players";
+import { getAvatarMarks, marksOf, type Marks } from "@/lib/live/players";
 import { formatRecord } from "@/lib/players";
 import { LIVE_PATH } from "@/lib/live/board";
 import { canFinalize, getSessionViewer } from "@/lib/slip/store";
@@ -61,7 +61,7 @@ function WeekNav({ weeks, selected, current, drafting }: { weeks: number[]; sele
   );
 }
 
-function Scorers({ label, tone, people, roles }: { label: string; tone: string; people: Scorer[]; roles: Map<string, "high" | "low"> }) {
+function Scorers({ label, tone, people, marks }: { label: string; tone: string; people: Scorer[]; marks: Map<string, Marks> }) {
   return (
     <div className="min-w-0">
       <p className={`label !mb-1 ${tone}`}>{label}</p>
@@ -70,7 +70,7 @@ function Scorers({ label, tone, people, roles }: { label: string; tone: string; 
       ) : (
         people.map((p) => (
           <Link key={p.slug} href={`/${p.slug}`} className="flex items-center gap-2 hover:opacity-80">
-            <Avatar name={p.name} photoUrl={p.photoUrl} className="size-7 text-xs" corner={roleCorner(roles, p.slug)} badgeClass="text-xs" />
+            <Avatar name={p.name} photoUrl={p.photoUrl} className="size-7 text-xs" {...marksOf(marks, p.slug)} badgeClass="text-xs" />
             <span className="truncate text-sm font-semibold">{p.name}</span>
           </Link>
         ))
@@ -83,7 +83,7 @@ export default async function BetSlipPage(props: PageProps<"/bet-slip">) {
   await connection();
   const { week } = await props.searchParams;
   const requested = typeof week === "string" && /^\d+$/.test(week) ? Number(week) : null;
-  const [slip, roles] = await Promise.all([getBetSlip(requested), getWeekRoles()]);
+  const [slip, marks] = await Promise.all([getBetSlip(requested), getAvatarMarks()]);
   const viewer = await getSessionViewer();
   const myRow = slip.rows.find((r) => r.slug === viewer?.slug);
 
@@ -130,8 +130,8 @@ export default async function BetSlipPage(props: PageProps<"/bet-slip">) {
           </p>
         )}
         <div className="grid grid-cols-2 gap-3 border-t border-zinc-800 pt-3">
-          <Scorers label="High scorer" tone="!text-emerald-400" people={slip.high} roles={roles} />
-          <Scorers label="Low scorer" tone="!text-red-400" people={slip.low} roles={roles} />
+          <Scorers label="High scorer" tone="!text-emerald-400" people={slip.high} marks={marks} />
+          <Scorers label="Low scorer" tone="!text-red-400" people={slip.low} marks={marks} />
         </div>
       </section>
 
@@ -155,7 +155,7 @@ export default async function BetSlipPage(props: PageProps<"/bet-slip">) {
           return (
             <li key={row.key} className="flex items-center gap-3 border-b border-zinc-800 px-4 py-3 last:border-b-0">
               <Link href={`/${row.slug}`} className="shrink-0">
-                <Avatar name={row.name} photoUrl={slip.photos.get(row.slug) ?? null} className="size-10 text-base" corner={roleCorner(roles, row.slug)} />
+                <Avatar name={row.name} photoUrl={slip.photos.get(row.slug) ?? null} className="size-10 text-base" {...marksOf(marks, row.slug)} />
               </Link>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-bold">{row.name}</p>
