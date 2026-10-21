@@ -216,7 +216,8 @@ export default async function Games(props: PageProps<"/games">) {
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 px-4 py-6">
-      {live.length > 0 && <AutoRefresh />}
+      {/* Live scores, and other players' picks dimming the lines they've taken. */}
+      <AutoRefresh />
 
       <header className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-bold tracking-tight">This Week&apos;s Board</h1>
