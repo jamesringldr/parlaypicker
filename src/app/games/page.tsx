@@ -13,7 +13,7 @@ import {
   type CollegeFilter,
   type Slate,
 } from "@/lib/games/scoreboard";
-import { formatMove, isMoveKind, spreadMove, totalMove, type MoveKind } from "@/lib/games/movement";
+import { formatMove, isMoveKind, sortByMovement, spreadMove, totalMove, type MoveKind } from "@/lib/games/movement";
 import { findGameProps, isPropTab } from "@/lib/odds/props";
 import { getUpcomingProps, type UpcomingProps } from "@/lib/odds/props-store";
 import { formatPrice } from "@/lib/rules";
@@ -37,37 +37,18 @@ const spec = (game: GameCard, slate: string, kind: "moneyline" | "spread" | "tot
   home: game.home.name,
 });
 
-// A price box with how far its line has moved since open under it, when that bet type is selected.
-function WithMove({ delta, children }: { delta: number | null; children: React.ReactNode }) {
-  if (delta === null) return children;
-  return (
-    <div className="flex shrink-0 flex-col items-center gap-0.5">
-      {children}
-      <span className="text-[10px] font-semibold leading-none tabular-nums text-blue-400">{formatMove(delta)}</span>
-    </div>
-  );
-}
-
-function Spread({ game, slate, which, move }: { game: GameCard; slate: string; which: "away" | "home"; move: MoveKind | null }) {
+function Spread({ game, slate, which }: { game: GameCard; slate: string; which: "away" | "home" }) {
   const p = game.lines?.spread[which];
   if (!p || p.line === null) return <Line top="-" bottom="" />;
-  return (
-    <WithMove delta={move === "spread" && game.lines ? spreadMove(game.lines, which) : null}>
-      <PickLine spec={spec(game, slate, "spread", which, p.line)} top={signed(p.line)} bottom={formatPrice(p.odds)} />
-    </WithMove>
-  );
+  return <PickLine spec={spec(game, slate, "spread", which, p.line)} top={signed(p.line)} bottom={formatPrice(p.odds)} />;
 }
 
 // The away row carries the over and the home row the under.
-function Total({ game, slate, which, move }: { game: GameCard; slate: string; which: "away" | "home"; move: MoveKind | null }) {
+function Total({ game, slate, which }: { game: GameCard; slate: string; which: "away" | "home" }) {
   const over = which === "away";
   const p = over ? game.lines?.total.over : game.lines?.total.under;
   if (!p || p.line === null) return <Line top="-" bottom="" />;
-  return (
-    <WithMove delta={move === "total" && game.lines ? totalMove(game.lines) : null}>
-      <PickLine spec={spec(game, slate, "total", over ? "over" : "under", p.line)} top={`${over ? "o" : "u"}${p.line}`} bottom={formatPrice(p.odds)} />
-    </WithMove>
-  );
+  return <PickLine spec={spec(game, slate, "total", over ? "over" : "under", p.line)} top={`${over ? "o" : "u"}${p.line}`} bottom={formatPrice(p.odds)} />;
 }
 
 function Moneyline({ game, slate, which }: { game: GameCard; slate: string; which: "away" | "home" }) {
@@ -76,18 +57,15 @@ function Moneyline({ game, slate, which }: { game: GameCard; slate: string; whic
   return <PickLine spec={spec(game, slate, "moneyline", which, null)} top={formatPrice(odds)} bottom="ML" />;
 }
 
-function TeamRow({ side, game, which, slate, move }: { side: Side; game: GameCard; which: "away" | "home"; slate: string; move: MoveKind | null }) {
+function TeamRow({ side, game, which, slate }: { side: Side; game: GameCard; which: "away" | "home"; slate: string }) {
   const { lines, state } = game;
   const open = lines?.open;
-  // Before kickoff the left column is where the lines opened: the favorite's spread on its row, the total on the other.
-  const openText =
-    !open || state !== "pre"
-      ? ""
-      : open.favorite === which && open.spread !== null
-        ? signed(open.spread)
-        : open.favorite !== null && open.favorite !== which && open.total !== null
-          ? String(open.total)
-          : "";
+  // Before kickoff the left column is where the lines opened, with how far each has moved since: the favorite's
+  // spread on its row, the total on the other.
+  const spreadRow = state === "pre" && !!lines && !!open && open.favorite === which && open.spread !== null;
+  const totalRow = state === "pre" && !!lines && !!open && open.favorite !== null && open.favorite !== which && open.total !== null;
+  const openText = spreadRow ? signed(open!.spread!) : totalRow ? String(open!.total) : "";
+  const moved = spreadRow ? spreadMove(lines!, which) : totalRow ? totalMove(lines!) : null;
 
   return (
     <div className="flex items-center gap-1.5 sm:gap-2">
@@ -105,11 +83,14 @@ function TeamRow({ side, game, which, slate, move }: { side: Side; game: GameCar
       {state === "pre" ? (
         <>
           {/* The opening line is the first thing to go when the row is too tight. */}
-          <p className="hidden w-8 shrink-0 text-center text-sm text-zinc-400 min-[400px]:block sm:w-10">{openText}</p>
+          <div className="hidden w-10 shrink-0 flex-col items-center gap-0.5 text-center min-[400px]:flex sm:w-12">
+            <p className="text-sm leading-tight text-zinc-400">{openText}</p>
+            {moved !== null && <p className="text-[10px] font-semibold leading-none tabular-nums text-blue-400">{formatMove(moved)}</p>}
+          </div>
           {lines && (
             <div className="flex gap-1 sm:gap-1.5">
-              <Spread game={game} slate={slate} which={which} move={move} />
-              <Total game={game} slate={slate} which={which} move={move} />
+              <Spread game={game} slate={slate} which={which} />
+              <Total game={game} slate={slate} which={which} />
               <Moneyline game={game} slate={slate} which={which} />
             </div>
           )}
@@ -121,11 +102,11 @@ function TeamRow({ side, game, which, slate, move }: { side: Side; game: GameCar
   );
 }
 
-function Card({ game, propsId, slate, move }: { game: GameCard; propsId?: string; slate: string; move: MoveKind | null }) {
+function Card({ game, propsId, slate }: { game: GameCard; propsId?: string; slate: string }) {
   return (
     <article className="flex flex-col gap-3 rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
-      <TeamRow side={game.away} game={game} which="away" slate={slate} move={move} />
-      <TeamRow side={game.home} game={game} which="home" slate={slate} move={move} />
+      <TeamRow side={game.away} game={game} which="away" slate={slate} />
+      <TeamRow side={game.home} game={game} which="home" slate={slate} />
       <div className="flex items-center justify-between gap-3">
         {game.state === "pre" ? (
           <p className="flex min-w-0 items-center gap-1.5 text-sm text-zinc-400">
@@ -151,7 +132,7 @@ function Card({ game, propsId, slate, move }: { game: GameCard; propsId?: string
   );
 }
 
-function Section({ title, games, open, propsIds, slate, move, controls }: { title: string; games: GameCard[]; open: boolean; propsIds: Map<string, string>; slate: string; move: MoveKind | null; controls?: React.ReactNode }) {
+function Section({ title, games, open, propsIds, slate, controls }: { title: string; games: GameCard[]; open: boolean; propsIds: Map<string, string>; slate: string; controls?: React.ReactNode }) {
   if (games.length === 0) return null;
   return (
     <details open={open} className="group">
@@ -163,7 +144,7 @@ function Section({ title, games, open, propsIds, slate, move, controls }: { titl
       </summary>
       <div className="flex flex-col gap-3">
         {games.map((g) => (
-          <Card key={g.id} game={g} propsId={g.state === "pre" ? propsIds.get(g.id) : undefined} slate={slate} move={move} />
+          <Card key={g.id} game={g} propsId={g.state === "pre" ? propsIds.get(g.id) : undefined} slate={slate} />
         ))}
       </div>
     </details>
@@ -182,7 +163,7 @@ const FILTERS: { key: CollegeFilter; label: string }[] = [
 
 export default async function Games(props: PageProps<"/games">) {
   await connection();
-  const { sport, conf, tab, view, player, prop, cat, game: gameParam, move: moveParam } = await props.searchParams;
+  const { sport, conf, tab, view, player, prop, cat, game: gameParam, sort: sortParam } = await props.searchParams;
   const ncaa = sport === "ncaa";
   const onProps = !ncaa && tab === "props";
   const propsView = view === "games" ? "games" : "players";
@@ -228,27 +209,27 @@ export default async function Games(props: PageProps<"/games">) {
 
   // Which ESPN slate a pick came from, so the server can find the game again.
   const slate = ncaa ? filter : "nfl";
-  const move = isMoveKind(moveParam) ? moveParam : null;
+  const sort = isMoveKind(sortParam) ? sortParam : null;
   // Tapping the selected button clears it, so only one is on at a time or neither.
-  const moveHref = (kind: MoveKind) => {
+  const sortHref = (kind: MoveKind) => {
     const q = new URLSearchParams();
     if (ncaa) q.set("sport", "ncaa");
     if (ncaa && filter !== "top25") q.set("conf", filter);
-    if (move !== kind) q.set("move", kind);
+    if (sort !== kind) q.set("sort", kind);
     return q.size > 0 ? `/games?${q}` : "/games";
   };
-  const moveControls = (
+  const sortControls = (
     <>
-      <span className="text-xs font-semibold text-zinc-400">Line Movement:</span>
+      <span className="text-xs font-semibold text-zinc-400">Sort by Movement:</span>
       {(["spread", "total"] as const).map((kind) => (
         <Link
           key={kind}
-          href={moveHref(kind)}
+          href={sortHref(kind)}
           replace
           scroll={false}
-          aria-current={move === kind ? "true" : undefined}
+          aria-current={sort === kind ? "true" : undefined}
           className={`rounded-full border px-3 py-1 text-xs font-semibold ${
-            move === kind ? "border-blue-600 bg-blue-600 text-white" : "border-zinc-600 text-zinc-300 hover:bg-zinc-800"
+            sort === kind ? "border-blue-600 bg-blue-600 text-white" : "border-zinc-600 text-zinc-300 hover:bg-zinc-800"
           }`}
         >
           {kind === "spread" ? "Spread" : "Total"}
@@ -365,9 +346,9 @@ export default async function Games(props: PageProps<"/games">) {
         <p className="card text-sm text-zinc-400">{ncaa && filter === "top25" ? "No ranked teams play this week." : "No games this week."}</p>
       )}
 
-      <Section title="Live" slate={slate} move={move} games={live} open propsIds={propsIds} />
-      <Section title="Upcoming" slate={slate} move={move} controls={moveControls} games={upcoming} open propsIds={propsIds} />
-      <Section title="Final" slate={slate} move={move} games={final} open={live.length === 0 && upcoming.length === 0} propsIds={propsIds} />
+      <Section title="Live" slate={slate} games={live} open propsIds={propsIds} />
+      <Section title="Upcoming" slate={slate} controls={sortControls} games={sort ? sortByMovement(upcoming, sort) : upcoming} open propsIds={propsIds} />
+      <Section title="Final" slate={slate} games={final} open={live.length === 0 && upcoming.length === 0} propsIds={propsIds} />
       {games.some((g) => g.lines) && (
         <p className="text-center text-xs text-zinc-500">Lines from DraftKings via ESPN. FanDuel&apos;s can differ.</p>
       )}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Lines } from "./espn-games";
-import { formatMove, spreadMove, totalMove } from "./movement";
+import { formatMove, moveSize, sortByMovement, spreadMove, totalMove } from "./movement";
 
 const lines = (over: Partial<Lines> & { open: Lines["open"] }): Lines => ({
   spread: { away: { line: 4.5, odds: -110 }, home: { line: -4.5, odds: -110 } },
@@ -53,5 +53,38 @@ describe("formatMove", () => {
     expect(formatMove(1.5)).toBe("▲1.5");
     expect(formatMove(-2)).toBe("▼2");
     expect(formatMove(0)).toBe("0");
+  });
+});
+
+describe("sortByMovement", () => {
+  const game = (id: string, open: Lines["open"], now: { home: number; total: number }) => ({
+    id,
+    lines: lines({
+      open,
+      spread: { away: { line: -now.home, odds: -110 }, home: { line: now.home, odds: -110 } },
+      total: { over: { line: now.total, odds: -110 }, under: { line: now.total, odds: -110 } },
+    }),
+  });
+  // a: spread moved 1, total 4. b: spread moved 3, total 0. c: spread moved 2, total 2. d: no open line.
+  const games = [
+    game("a", { total: 40, favorite: "home", spread: -3 }, { home: -4, total: 44 }),
+    game("b", { total: 45, favorite: "home", spread: -3 }, { home: -6, total: 45 }),
+    game("c", { total: 50, favorite: "home", spread: -3 }, { home: -1, total: 48 }),
+    { id: "d", lines: null },
+  ];
+
+  it("puts the biggest spread move first, whichever way it went, and games without lines last", () => {
+    expect(sortByMovement(games, "spread").map((g) => g.id)).toEqual(["b", "c", "a", "d"]);
+  });
+  it("sorts by total movement separately", () => {
+    expect(sortByMovement(games, "total").map((g) => g.id)).toEqual(["a", "c", "b", "d"]);
+  });
+  it("keeps kickoff order for ties and doesn't change the original", () => {
+    const tied = [game("x", { total: 40, favorite: "home", spread: -3 }, { home: -4, total: 41 }), game("y", { total: 40, favorite: "home", spread: -3 }, { home: -4, total: 41 })];
+    expect(sortByMovement(tied, "spread").map((g) => g.id)).toEqual(["x", "y"]);
+    expect(games.map((g) => g.id)).toEqual(["a", "b", "c", "d"]);
+  });
+  it("moveSize is null without lines", () => {
+    expect(moveSize(null, "spread")).toBeNull();
   });
 });
